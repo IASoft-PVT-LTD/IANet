@@ -2,7 +2,6 @@
   <img src="logo.png" alt="IANet Logo" width="190" style="padding-bottom: 8px;"/>
   <br/>
 
-  <img src="https://img.shields.io/badge/license-Apache v2-darkblue.svg" alt="License"/>
   <img src="https://img.shields.io/badge/platform-Win64 | Linux-darkred.svg" alt="Platform"/>
   <img src="https://img.shields.io/badge/compiler-MSVC | Clang-darkgreen.svg" alt="Compiler"/>
 
@@ -86,4 +85,4 @@ int main(int argc, char *argv[])
 
 ## License
 
-Copyright © 2026 IASoft (PVT LTD). Licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+Copyright © 2026 IASoft (PVT) LTD. Licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0).
