@@ -25,14 +25,14 @@ You can easily integrate IANet into your project using CMake's `FetchContent`:
 include(FetchContent)
 
 FetchContent_Declare(
-    ianet
-    GIT_REPOSITORY https://github.com/I-A-S/ianet.git
-    GIT_TAG        main # Or a specific release tag
+    IANET
+    GIT_REPOSITORY https://github.com/IASoft-PVT-LTD/IANet
+    GIT_TAG        main
 )
-FetchContent_MakeAvailable(ianet)
+FetchContent_MakeAvailable(IANET)
 
 # Link against your target
-target_link_libraries(your_target PRIVATE ianet)
+target_link_libraries(your_target PRIVATE IANET)
 ```
 
 ### Example
