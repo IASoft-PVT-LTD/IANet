@@ -1,4 +1,4 @@
-add_library(ianet STATIC 
+add_library(IANET STATIC 
     cpp/client.cpp
     cpp/connection.cpp
     cpp/context.cpp
@@ -9,11 +9,11 @@ add_library(ianet STATIC
     cpp/vendor/picohttpparser/picohttpparser.c
 )
 
-target_include_directories(ianet PUBLIC
-    $<BUILD_INTERFACE:${ianet_ROOT}/include>
+target_include_directories(IANET PUBLIC
+    $<BUILD_INTERFACE:${IANET_ROOT}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_include_directories(ianet PRIVATE hpp)
+target_include_directories(IANET PRIVATE hpp)
 
-target_link_libraries(ianet PUBLIC libauxid)
-target_link_libraries(ianet PRIVATE auxid_platform_standard)
+target_link_libraries(IANET PUBLIC libauxid)
+target_link_libraries(IANET PRIVATE auxid_platform_standard)

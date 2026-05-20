@@ -6,7 +6,7 @@ set(SRC_FILES
 
 add_executable(TestSuite ${SRC_FILES})
 
-target_link_libraries(TestSuite PRIVATE libauxid ianet)
+target_link_libraries(TestSuite PRIVATE libauxid IANET)
 
 if(MSVC)
     target_compile_options(TestSuite PRIVATE /EHsc)
