@@ -3,6 +3,10 @@ add_library(ianet STATIC
     cpp/connection.cpp
     cpp/context.cpp
     cpp/server.cpp
+    cpp/http_client.cpp
+    cpp/http_server.cpp
+    cpp/http_connection.cpp
+    cpp/vendor/picohttpparser/picohttpparser.c
 )
 
 target_include_directories(ianet PUBLIC

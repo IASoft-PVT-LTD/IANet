@@ -13,8 +13,10 @@
 
 namespace ianet
 {
-  struct Server_T
+  struct SocketServer_T
   {
     NativeSocket sock{};
+    EProtocolType protocol{};
+    u16 port{};
   };
 } // namespace ianet

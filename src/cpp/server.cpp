@@ -16,16 +16,19 @@
 
 namespace ianet
 {
-  auto create_server(Context &ctx, u16 port) -> Result<Server>
+  auto create_socket_server(Context &ctx, EProtocolType protocol, u16 port) -> Result<SocketServer>
   {
     (void) ctx;
 
+    const int type = protocol == EProtocolType::TCP ? SOCK_STREAM : SOCK_DGRAM;
+
 #if AU_PLATFORM_WINDOWS
-    const NativeSocket listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    const int proto = protocol == EProtocolType::TCP ? IPPROTO_TCP : IPPROTO_UDP;
+    const NativeSocket listen_sock = socket(AF_INET, type, proto);
     if (listen_sock == INVALID_SOCKET)
       return fail("socket failed: %d", WSAGetLastError());
 #else
-    const NativeSocket listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+    const NativeSocket listen_sock = socket(AF_INET, type, 0);
     if (!native_socket_valid(listen_sock))
       return fail("socket failed: %d", errno);
 #endif
@@ -67,48 +70,57 @@ namespace ianet
       return fail("bind failed: %d", err);
     }
 
-#if AU_PLATFORM_WINDOWS
-    if (listen(listen_sock, SOMAXCONN) == SOCKET_ERROR)
-#else
-    if (::listen(listen_sock, SOMAXCONN) < 0)
-#endif
+    if (protocol == EProtocolType::TCP)
     {
 #if AU_PLATFORM_WINDOWS
-      const int err = WSAGetLastError();
+      if (listen(listen_sock, SOMAXCONN) == SOCKET_ERROR)
 #else
-      const int err = errno;
+      if (::listen(listen_sock, SOMAXCONN) < 0)
 #endif
-      native_socket_close(listen_sock);
-      return fail("listen failed: %d", err);
+      {
+#if AU_PLATFORM_WINDOWS
+        const int err = WSAGetLastError();
+#else
+        const int err = errno;
+#endif
+        native_socket_close(listen_sock);
+        return fail("listen failed: %d", err);
+      }
     }
 
     HeapAllocator alloc;
-    void *mem = alloc.alloc(sizeof(Server_T), alignof(Server_T));
+    void *mem = alloc.alloc(sizeof(SocketServer_T), alignof(SocketServer_T));
     if (!mem)
     {
       native_socket_close(listen_sock);
       return fail("failed to allocate server");
     }
 
-    const auto server = new (mem) Server_T();
+    const auto server = new (mem) SocketServer_T();
     server->sock = listen_sock;
+    server->protocol = protocol;
+    server->port = port;
 
-    return Box<Server_T, Deleter_Server_T<HeapAllocator>>(server, Deleter_Server_T<HeapAllocator>(alloc));
+    return Box<SocketServer_T, Deleter_SocketServer_T<HeapAllocator>>(server,
+                                                                      Deleter_SocketServer_T<HeapAllocator>(alloc));
   }
 
-  auto __internal_destory_server(HeapAllocator *allocator, Server_T *server) -> void
+  auto __internal_destory_server(HeapAllocator *allocator, SocketServer_T *server) -> void
   {
     if (!server)
       return;
 
     native_socket_close(server->sock);
 
-    server->~Server_T();
-    allocator->free(server, sizeof(Server_T), alignof(Server_T));
+    server->~SocketServer_T();
+    allocator->free(server, sizeof(SocketServer_T), alignof(SocketServer_T));
   }
 
-  auto server_accept(Server &server) -> Result<Connection>
+  auto socket_server_accept(SocketServer &server) -> Result<Connection>
   {
+    if (server->protocol == EProtocolType::UDP)
+      return fail("accept is not supported for UDP servers");
+
 #if AU_PLATFORM_WINDOWS
     const NativeSocket client_sock = accept(server->sock, nullptr, nullptr);
     if (client_sock == INVALID_SOCKET)

@@ -16,39 +16,41 @@
 
 namespace ianet
 {
-  auto create_client(Context &ctx) -> Result<Client>
+  auto create_socket_client(Context &ctx, EProtocolType protocol) -> Result<SocketClient>
   {
     (void) ctx;
 
     HeapAllocator alloc;
-    void *mem = alloc.alloc(sizeof(Client_T), alignof(Client_T));
+    void *mem = alloc.alloc(sizeof(SocketClient_T), alignof(SocketClient_T));
     if (!mem)
       return fail("failed to allocate client");
 
-    const auto client = new (mem) Client_T();
+    const auto client = new (mem) SocketClient_T();
+    client->protocol = protocol;
 
-    return Box<Client_T, Deleter_Client_T<HeapAllocator>>(client, Deleter_Client_T<HeapAllocator>(alloc));
+    return Box<SocketClient_T, Deleter_SocketClient_T<HeapAllocator>>(client, Deleter_SocketClient_T<HeapAllocator>(alloc));
   }
 
-  auto __internal_destory_client(HeapAllocator *allocator, Client_T *client) -> void
+  auto __internal_destory_client(HeapAllocator *allocator, SocketClient_T *client) -> void
   {
     if (!client)
       return;
 
-    client->~Client_T();
-    allocator->free(client, sizeof(Client_T), alignof(Client_T));
+    client->~SocketClient_T();
+    allocator->free(client, sizeof(SocketClient_T), alignof(SocketClient_T));
   }
 
-  auto client_connect(Client &client, const String &address, u16 port) -> Result<Connection>
+  auto socket_client_connect(SocketClient &client, const String &address, u16 port) -> Result<Connection>
   {
-    (void) client;
+    const int type = client->protocol == EProtocolType::TCP ? SOCK_STREAM : SOCK_DGRAM;
 
 #if AU_PLATFORM_WINDOWS
-    const NativeSocket s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    const int proto = client->protocol == EProtocolType::TCP ? IPPROTO_TCP : IPPROTO_UDP;
+    const NativeSocket s = socket(AF_INET, type, proto);
     if (s == INVALID_SOCKET)
       return fail("socket failed: %d", WSAGetLastError());
 #else
-    const NativeSocket s = socket(AF_INET, SOCK_STREAM, 0);
+    const NativeSocket s = socket(AF_INET, type, 0);
     if (!native_socket_valid(s))
       return fail("socket failed: %d", errno);
 #endif

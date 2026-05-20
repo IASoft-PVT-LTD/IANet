@@ -1,6 +1,7 @@
 set(SRC_FILES
     "cpp/main.cpp"
-    "cpp/ianet_tests.cpp"
+    "cpp/socket_tests.cpp"
+    "cpp/http_tests.cpp"
 )
 
 add_executable(TestSuite ${SRC_FILES})

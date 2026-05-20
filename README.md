@@ -52,10 +52,10 @@ auto app_main() -> Result<void>
   auto ctx = AU_TRY(ianet::create_context());
 
   // Create a client
-  auto client = AU_TRY(ianet::create_client(ctx));
+  auto client = AU_TRY(ianet::create_socket_client(ctx));
 
   // Connect to a local server on port 8080
-  auto conn = AU_TRY(ianet::client_connect(client, String("127.0.0.1"), 8080));
+  auto conn = AU_TRY(ianet::socket_client_connect(client, String("127.0.0.1"), 8080));
 
   // Send a message
   const u8 msg[] = {'h', 'e', 'l', 'l', 'o'};

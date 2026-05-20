@@ -1,0 +1,308 @@
+// IANet: Cross-Platform Networking Library for C++
+//
+// Copyright (C) 2026 I-A-S (ias@iasoft.dev)
+// Copyright (C) 2026 IASoft (PVT) LTD (contact@iasoft.dev)
+//
+// This source code is licensed under the PolyForm Noncommercial License 1.0.0.
+// A copy of this license is included in the LICENSE file at the root of this project,
+// and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
+
+#include <ianet_http.hpp>
+#include <vendor/picohttpparser/picohttpparser.h>
+#include <string>
+
+namespace ianet
+{
+  auto __internal_destory_http_connection(HeapAllocator *allocator, HttpConnection_T *connection) -> void
+  {
+    if (!connection)
+      return;
+
+    connection->~HttpConnection_T();
+    allocator->free(connection, sizeof(HttpConnection_T), alignof(HttpConnection_T));
+  }
+
+  auto http_connection_send_request(HttpConnection &conn, const HttpRequest &req) -> Result<void>
+  {
+    String buf;
+    buf.append(req.method);
+    buf.append(" ");
+    buf.append(req.path);
+    buf.append(String::format(" HTTP/1.%d\r\n", req.minor_version));
+
+    for (const auto &header : req.headers)
+    {
+      buf.append(header.first);
+      buf.append(": ");
+      buf.append(header.second);
+      buf.append("\r\n");
+    }
+
+    if (!req.body.empty())
+    {
+      buf.append(String::format("Content-Length: %zu\r\n", req.body.size()));
+    }
+    buf.append("\r\n");
+
+    auto send_r = connection_send(conn->conn, Span<const u8>(reinterpret_cast<const u8 *>(buf.data()), buf.size()));
+    if (send_r.is_err())
+      return send_r;
+
+    if (!req.body.empty())
+    {
+      auto send_r2 = connection_send(conn->conn, Span<const u8>(req.body.data(), req.body.size()));
+      if (send_r2.is_err())
+        return send_r2;
+    }
+
+    return Result<void>();
+  }
+
+  auto http_connection_send_response(HttpConnection &conn, const HttpResponse &res) -> Result<void>
+  {
+    String buf;
+    buf.append(String::format("HTTP/1.%d %u ", res.minor_version, res.status_code));
+    buf.append(res.status_message);
+    buf.append("\r\n");
+
+    for (const auto &header : res.headers)
+    {
+      buf.append(header.first);
+      buf.append(": ");
+      buf.append(header.second);
+      buf.append("\r\n");
+    }
+
+    if (!res.body.empty())
+    {
+      buf.append(String::format("Content-Length: %zu\r\n", res.body.size()));
+    }
+    buf.append("\r\n");
+
+    auto send_r = connection_send(conn->conn, Span<const u8>(reinterpret_cast<const u8 *>(buf.data()), buf.size()));
+    if (send_r.is_err())
+      return send_r;
+
+    if (!res.body.empty())
+    {
+      auto send_r2 = connection_send(conn->conn, Span<const u8>(res.body.data(), res.body.size()));
+      if (send_r2.is_err())
+        return send_r2;
+    }
+
+    return Result<void>();
+  }
+
+  auto http_connection_receive_response(HttpConnection &conn) -> Result<HttpResponse>
+  {
+    Vec<u8> buf;
+    int minor_version;
+    int status;
+    const char *msg;
+    size_t msg_len;
+    struct phr_header headers[100];
+    size_t num_headers;
+    int pret;
+
+    while (true)
+    {
+      auto recv_r = connection_receive(conn->conn, 4096);
+      if (recv_r.is_err())
+        return fail("failed to receive: %s", recv_r.error().c_str());
+
+      auto chunk = std::move(recv_r.unwrap());
+      if (chunk.empty())
+        return fail("connection closed by peer");
+
+      buf.reserve(buf.size() + chunk.size());
+      for (auto b : chunk)
+      {
+        buf.push_back(b);
+      }
+
+      num_headers = sizeof(headers) / sizeof(headers[0]);
+      pret = phr_parse_response(reinterpret_cast<const char *>(buf.data()), buf.size(), &minor_version, &status, &msg,
+                                &msg_len, headers, &num_headers, 0);
+
+      if (pret > 0)
+        break; // successfully parsed the response
+      else if (pret == -1)
+        return fail("failed to parse http response");
+
+      // pret == -2 means incomplete, continue reading
+    }
+
+    HttpResponse res;
+    res.minor_version = minor_version;
+    res.status_code = static_cast<u16>(status);
+    res.status_message = String(msg, msg_len);
+
+    usize content_length = 0;
+    for (size_t i = 0; i != num_headers; ++i)
+    {
+      String name(headers[i].name, headers[i].name_len);
+      String value(headers[i].value, headers[i].value_len);
+      res.headers.push_back(Pair<String, String>(name, value));
+
+      // Simple case-insensitive check for Content-Length
+      if (name.size() == 14)
+      {
+        bool match = true;
+        const char *cl = "content-length";
+        for (usize j = 0; j < 14; ++j)
+        {
+          char c = name.data()[j];
+          if (c >= 'A' && c <= 'Z')
+            c += 32;
+          if (c != cl[j])
+          {
+            match = false;
+            break;
+          }
+        }
+        if (match)
+        {
+          content_length = std::stoull(value.c_str());
+        }
+      }
+    }
+
+    usize header_size = static_cast<usize>(pret);
+    usize body_bytes_read = buf.size() - header_size;
+
+    if (body_bytes_read > 0)
+    {
+      res.body.reserve(res.body.size() + body_bytes_read);
+      for (usize i = 0; i < body_bytes_read; ++i)
+      {
+        res.body.push_back(buf[header_size + i]);
+      }
+    }
+
+    while (res.body.size() < content_length)
+    {
+      usize to_read = content_length - res.body.size();
+      auto recv_r = connection_receive(conn->conn, to_read);
+      if (recv_r.is_err())
+        return fail("failed to receive body: %s", recv_r.error().c_str());
+
+      auto chunk = std::move(recv_r.unwrap());
+      if (chunk.empty())
+        return fail("connection closed by peer while reading body");
+
+      res.body.reserve(res.body.size() + chunk.size());
+      for (auto b : chunk)
+      {
+        res.body.push_back(b);
+      }
+    }
+
+    return res;
+  }
+
+  auto http_connection_receive_request(HttpConnection &conn) -> Result<HttpRequest>
+  {
+    Vec<u8> buf;
+    const char *method, *path;
+    size_t method_len, path_len;
+    int minor_version;
+    struct phr_header headers[100];
+    size_t num_headers;
+    int pret;
+
+    while (true)
+    {
+      auto recv_r = connection_receive(conn->conn, 4096);
+      if (recv_r.is_err())
+        return fail("failed to receive: %s", recv_r.error().c_str());
+
+      auto chunk = std::move(recv_r.unwrap());
+      if (chunk.empty())
+        return fail("connection closed by peer");
+
+      buf.reserve(buf.size() + chunk.size());
+      for (auto b : chunk)
+      {
+        buf.push_back(b);
+      }
+
+      num_headers = sizeof(headers) / sizeof(headers[0]);
+      pret = phr_parse_request(reinterpret_cast<const char *>(buf.data()), buf.size(), &method, &method_len, &path,
+                               &path_len, &minor_version, headers, &num_headers, 0);
+
+      if (pret > 0)
+        break; // successfully parsed the request
+      else if (pret == -1)
+        return fail("failed to parse http request");
+
+      // pret == -2 means incomplete, continue reading
+    }
+
+    HttpRequest req;
+    req.method = String(method, method_len);
+    req.path = String(path, path_len);
+    req.minor_version = minor_version;
+
+    usize content_length = 0;
+    for (size_t i = 0; i != num_headers; ++i)
+    {
+      String name(headers[i].name, headers[i].name_len);
+      String value(headers[i].value, headers[i].value_len);
+      req.headers.push_back(Pair<String, String>(name, value));
+
+      // Simple case-insensitive check for Content-Length
+      if (name.size() == 14)
+      {
+        bool match = true;
+        const char *cl = "content-length";
+        for (usize j = 0; j < 14; ++j)
+        {
+          char c = name.data()[j];
+          if (c >= 'A' && c <= 'Z')
+            c += 32;
+          if (c != cl[j])
+          {
+            match = false;
+            break;
+          }
+        }
+        if (match)
+        {
+          content_length = std::stoull(value.c_str());
+        }
+      }
+    }
+
+    usize header_size = static_cast<usize>(pret);
+    usize body_bytes_read = buf.size() - header_size;
+
+    if (body_bytes_read > 0)
+    {
+      req.body.reserve(req.body.size() + body_bytes_read);
+      for (usize i = 0; i < body_bytes_read; ++i)
+      {
+        req.body.push_back(buf[header_size + i]);
+      }
+    }
+
+    while (req.body.size() < content_length)
+    {
+      usize to_read = content_length - req.body.size();
+      auto recv_r = connection_receive(conn->conn, to_read);
+      if (recv_r.is_err())
+        return fail("failed to receive body: %s", recv_r.error().c_str());
+
+      auto chunk = std::move(recv_r.unwrap());
+      if (chunk.empty())
+        return fail("connection closed by peer while reading body");
+
+      req.body.reserve(req.body.size() + chunk.size());
+      for (auto b : chunk)
+      {
+        req.body.push_back(b);
+      }
+    }
+
+    return req;
+  }
+} // namespace ianet

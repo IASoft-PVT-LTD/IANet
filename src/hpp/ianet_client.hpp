@@ -13,7 +13,8 @@
 
 namespace ianet
 {
-  struct Client_T
+  struct SocketClient_T
   {
+    EProtocolType protocol{};
   };
 } // namespace ianet
