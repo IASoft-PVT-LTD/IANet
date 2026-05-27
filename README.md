@@ -47,9 +47,11 @@ target_link_libraries(your_target PRIVATE IANET)
 Here is a simple example demonstrating how to create a client, connect to a server, and send/receive data:
 
 ```cpp
-#include <ianet/ianet.hpp>
-#include <auxid/core/main_thread.hpp>
-#include <auxid/core/logger.hpp>
+#include <utility>
+
+#include <auxid/macros.hpp>
+
+import ianet;
 
 using namespace au;
 
