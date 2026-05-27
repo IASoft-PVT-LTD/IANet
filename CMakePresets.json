@@ -149,6 +149,14 @@
       "output": {
         "outputOnFailure": true
       }
+    },
+    {
+      "name": "ianet-x64-windows-msvc",
+      "configurePreset": "ianet-x64-windows-msvc",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ],
   "include": [
