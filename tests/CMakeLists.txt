@@ -8,10 +8,6 @@ add_executable(TestSuite ${SRC_FILES})
 
 target_link_libraries(TestSuite PRIVATE libauxid IANET)
 
-if(MSVC)
-    target_compile_options(TestSuite PRIVATE /EHsc)
-else()
-    target_compile_options(TestSuite PRIVATE -fexceptions)
-endif()
+set_target_properties(TestSuite PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
 add_test(NAME TestSuite COMMAND TestSuite)

@@ -7,12 +7,26 @@
 // A copy of this license is included in the LICENSE file at the root of this project,
 // and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
-#include <ianet_client.hpp>
-#include <ianet_connection.hpp>
+module;
 
-#if AU_PLATFORM_LINUX
+#include <auxid/macros.hpp>
+
+#if AU_PLATFORM_WINDOWS
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  define WIN32_LEAN_AND_MEAN
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
 #  include <cerrno>
+#  include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <unistd.h>
 #endif
+
+module ianet;
 
 namespace ianet
 {
@@ -20,24 +34,9 @@ namespace ianet
   {
     (void) ctx;
 
-    HeapAllocator alloc;
-    void *mem = alloc.alloc(sizeof(SocketClient_T), alignof(SocketClient_T));
-    if (!mem)
-      return fail("failed to allocate client");
-
-    const auto client = new (mem) SocketClient_T();
+    auto client = make_box<SocketClient_T>();
     client->protocol = protocol;
-
-    return Box<SocketClient_T, Deleter_SocketClient_T<HeapAllocator>>(client, Deleter_SocketClient_T<HeapAllocator>(alloc));
-  }
-
-  auto __internal_destory_client(HeapAllocator *allocator, SocketClient_T *client) -> void
-  {
-    if (!client)
-      return;
-
-    client->~SocketClient_T();
-    allocator->free(client, sizeof(SocketClient_T), alignof(SocketClient_T));
+    return client;
   }
 
   auto socket_client_connect(SocketClient &client, const String &address, u16 port) -> Result<Connection>
@@ -48,11 +47,11 @@ namespace ianet
     const int proto = client->protocol == EProtocolType::TCP ? IPPROTO_TCP : IPPROTO_UDP;
     const NativeSocket s = socket(AF_INET, type, proto);
     if (s == INVALID_SOCKET)
-      return fail("socket failed: %d", WSAGetLastError());
+      return fail("socket failed: {}", WSAGetLastError());
 #else
     const NativeSocket s = socket(AF_INET, type, 0);
     if (!native_socket_valid(s))
-      return fail("socket failed: %d", errno);
+      return fail("socket failed: {}", errno);
 #endif
 
     sockaddr_in addr{};
@@ -81,7 +80,7 @@ namespace ianet
       const int err = errno;
 #endif
       native_socket_close(s);
-      return fail("connect failed: %d", err);
+      return fail("connect failed: {}", err);
     }
 
     auto conn = __connection_from_socket(s);

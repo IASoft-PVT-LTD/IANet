@@ -7,11 +7,26 @@
 // A copy of this license is included in the LICENSE file at the root of this project,
 // and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
-#include <ianet_connection.hpp>
+module;
 
-#if AU_PLATFORM_LINUX
+#include <auxid/macros.hpp>
+
+#if AU_PLATFORM_WINDOWS
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  define WIN32_LEAN_AND_MEAN
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
 #  include <cerrno>
+#  include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <unistd.h>
 #endif
+
+module ianet;
 
 namespace ianet
 {
@@ -27,11 +42,11 @@ namespace ianet
         const int chunk = remain > static_cast<usize>(INT_MAX) ? INT_MAX : static_cast<int>(remain);
         const int r = send(s, reinterpret_cast<const char *>(data.data() + off), chunk, 0);
         if (r == SOCKET_ERROR)
-          return fail("send failed: %d", WSAGetLastError());
+          return fail("send failed: {}", WSAGetLastError());
 #else
         const ssize_t r = ::send(s, reinterpret_cast<const char *>(data.data() + off), static_cast<usize>(remain), 0);
         if (r < 0)
-          return fail("send failed: %d", errno);
+          return fail("send failed: {}", errno);
 #endif
         if (r == 0)
           return fail("send returned 0");
@@ -46,27 +61,9 @@ namespace ianet
     if (!native_socket_valid(sock))
       return fail("invalid socket handle");
 
-    HeapAllocator alloc;
-    void *mem = alloc.alloc(sizeof(Connection_T), alignof(Connection_T));
-    if (!mem)
-      return fail("failed to allocate connection");
-
-    const auto connection = new (mem) Connection_T();
+    auto connection = make_box<Connection_T>();
     connection->sock = sock;
-
-    return Box<Connection_T, Deleter_Connection_T<HeapAllocator>>(connection,
-                                                                  Deleter_Connection_T<HeapAllocator>(alloc));
-  }
-
-  auto __internal_destory_connection(HeapAllocator *allocator, Connection_T *connection) -> void
-  {
-    if (!connection)
-      return;
-
-    native_socket_close(connection->sock);
-
-    connection->~Connection_T();
-    allocator->free(connection, sizeof(Connection_T), alignof(Connection_T));
+    return connection;
   }
 
   auto connection_send(Connection &connection, Span<const u8> data) -> Result<void>
@@ -86,11 +83,11 @@ namespace ianet
     const int to_recv = size > static_cast<usize>(INT_MAX) ? INT_MAX : static_cast<int>(size);
     const int n = recv(connection->sock, reinterpret_cast<char *>(buf.data()), to_recv, 0);
     if (n == SOCKET_ERROR)
-      return fail("recv failed: %d", WSAGetLastError());
+      return fail("recv failed: {}", WSAGetLastError());
 #else
     const ssize_t n = ::recv(connection->sock, reinterpret_cast<char *>(buf.data()), static_cast<usize>(size), 0);
     if (n < 0)
-      return fail("recv failed: %d", errno);
+      return fail("recv failed: {}", errno);
 #endif
 
     buf.resize(static_cast<usize>(n));

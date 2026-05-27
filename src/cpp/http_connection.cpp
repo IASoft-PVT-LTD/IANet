@@ -7,28 +7,24 @@
 // A copy of this license is included in the LICENSE file at the root of this project,
 // and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
-#include <ianet_http.hpp>
-#include <vendor/picohttpparser/picohttpparser.h>
+module;
+
 #include <string>
+#include <utility>
+
+#include <vendor/picohttpparser/picohttpparser.h>
+
+module ianet.http;
 
 namespace ianet
 {
-  auto __internal_destory_http_connection(HeapAllocator *allocator, HttpConnection_T *connection) -> void
-  {
-    if (!connection)
-      return;
-
-    connection->~HttpConnection_T();
-    allocator->free(connection, sizeof(HttpConnection_T), alignof(HttpConnection_T));
-  }
-
   auto http_connection_send_request(HttpConnection &conn, const HttpRequest &req) -> Result<void>
   {
     String buf;
     buf.append(req.method);
     buf.append(" ");
     buf.append(req.path);
-    buf.append(String::format(" HTTP/1.%d\r\n", req.minor_version));
+    buf.append(String::format(" HTTP/1.{}\r\n", req.minor_version));
 
     for (const auto &header : req.headers)
     {
@@ -40,7 +36,7 @@ namespace ianet
 
     if (!req.body.empty())
     {
-      buf.append(String::format("Content-Length: %zu\r\n", req.body.size()));
+      buf.append(String::format("Content-Length: {}\r\n", req.body.size()));
     }
     buf.append("\r\n");
 
@@ -61,7 +57,7 @@ namespace ianet
   auto http_connection_send_response(HttpConnection &conn, const HttpResponse &res) -> Result<void>
   {
     String buf;
-    buf.append(String::format("HTTP/1.%d %u ", res.minor_version, res.status_code));
+    buf.append(String::format("HTTP/1.{} {} ", res.minor_version, res.status_code));
     buf.append(res.status_message);
     buf.append("\r\n");
 
@@ -75,7 +71,7 @@ namespace ianet
 
     if (!res.body.empty())
     {
-      buf.append(String::format("Content-Length: %zu\r\n", res.body.size()));
+      buf.append(String::format("Content-Length: {}\r\n", res.body.size()));
     }
     buf.append("\r\n");
 
@@ -108,7 +104,7 @@ namespace ianet
     {
       auto recv_r = connection_receive(conn->conn, 4096);
       if (recv_r.is_err())
-        return fail("failed to receive: %s", recv_r.error().c_str());
+        return fail("failed to receive: {}", recv_r.error());
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -184,7 +180,7 @@ namespace ianet
       usize to_read = content_length - res.body.size();
       auto recv_r = connection_receive(conn->conn, to_read);
       if (recv_r.is_err())
-        return fail("failed to receive body: %s", recv_r.error().c_str());
+        return fail("failed to receive body: {}", recv_r.error());
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -214,7 +210,7 @@ namespace ianet
     {
       auto recv_r = connection_receive(conn->conn, 4096);
       if (recv_r.is_err())
-        return fail("failed to receive: %s", recv_r.error().c_str());
+        return fail("failed to receive: {}", recv_r.error());
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -290,7 +286,7 @@ namespace ianet
       usize to_read = content_length - req.body.size();
       auto recv_r = connection_receive(conn->conn, to_read);
       if (recv_r.is_err())
-        return fail("failed to receive body: %s", recv_r.error().c_str());
+        return fail("failed to receive body: {}", recv_r.error());
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())

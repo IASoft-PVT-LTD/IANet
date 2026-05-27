@@ -1,40 +1,27 @@
-// Auxid: The Orthodox C++ Platform.
-// Copyright (C) 2026 IAS (ias@iasoft.dev)
+// IANet: Cross-Platform Networking Library for C++
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Copyright (C) 2026 I-A-S (ias@iasoft.dev)
+// Copyright (C) 2026 IASoft (PVT) LTD (contact@iasoft.dev)
 //
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-#include <auxid/auxid.hpp>
-
-#include <auxid/utils/test.hpp>
+// This source code is licensed under the PolyForm Noncommercial License 1.0.0.
+// A copy of this license is included in the LICENSE file at the root of this project,
+// and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
 #include <iostream>
 
+#include <auxid/macros.hpp>
+
+import auxid;
+import auxid.test;
+
 using namespace au;
 
-int main(int agrc, char *argv[])
+int main(int argc, char *argv[])
 {
-  struct ThreadInitGuard
-  {
-    ThreadInitGuard()
-    {
-      auxid::initialize_main_thread();
-    }
+  AU_UNUSED(argc);
+  AU_UNUSED(argv);
 
-    ~ThreadInitGuard()
-    {
-      auxid::terminate_main_thread();
-    }
-  } _thread_init_guard;
+  auxid::MainThreadGuard _main_thread_guard;
 
   std::cout << console::GREEN << "\n================================\n";
   std::cout << "   ianet - Unit Test Suite\n";

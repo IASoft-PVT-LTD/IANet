@@ -9,11 +9,20 @@ add_library(IANET STATIC
     cpp/vendor/picohttpparser/picohttpparser.c
 )
 
-target_include_directories(IANET PUBLIC
-    $<BUILD_INTERFACE:${IANET_ROOT}/include>
-    $<INSTALL_INTERFACE:include>
+target_sources(IANET
+    PUBLIC FILE_SET ianet_modules TYPE CXX_MODULES
+        BASE_DIRS "${CMAKE_CURRENT_LIST_DIR}/modules"
+        FILES
+            modules/ianet.cppm
+            modules/ianet.http.cppm
 )
+
 target_include_directories(IANET PRIVATE hpp)
 
 target_link_libraries(IANET PUBLIC libauxid)
-target_link_libraries(IANET PRIVATE auxid_platform_standard)
+
+if(WIN32)
+    target_link_libraries(IANET PUBLIC ws2_32)
+endif()
+
+set_target_properties(IANET PROPERTIES CXX_SCAN_FOR_MODULES ON)

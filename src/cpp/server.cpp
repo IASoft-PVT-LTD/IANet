@@ -7,12 +7,26 @@
 // A copy of this license is included in the LICENSE file at the root of this project,
 // and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
-#include <ianet_connection.hpp>
-#include <ianet_server.hpp>
+module;
 
-#if AU_PLATFORM_LINUX
+#include <auxid/macros.hpp>
+
+#if AU_PLATFORM_WINDOWS
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  define WIN32_LEAN_AND_MEAN
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
 #  include <cerrno>
+#  include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <unistd.h>
 #endif
+
+module ianet;
 
 namespace ianet
 {
@@ -26,11 +40,11 @@ namespace ianet
     const int proto = protocol == EProtocolType::TCP ? IPPROTO_TCP : IPPROTO_UDP;
     const NativeSocket listen_sock = socket(AF_INET, type, proto);
     if (listen_sock == INVALID_SOCKET)
-      return fail("socket failed: %d", WSAGetLastError());
+      return fail("socket failed: {}", WSAGetLastError());
 #else
     const NativeSocket listen_sock = socket(AF_INET, type, 0);
     if (!native_socket_valid(listen_sock))
-      return fail("socket failed: %d", errno);
+      return fail("socket failed: {}", errno);
 #endif
 
     int opt = 1;
@@ -47,7 +61,7 @@ namespace ianet
       const int err = errno;
 #endif
       native_socket_close(listen_sock);
-      return fail("setsockopt SO_REUSEADDR failed: %d", err);
+      return fail("setsockopt SO_REUSEADDR failed: {}", err);
     }
 
     sockaddr_in addr{};
@@ -67,7 +81,7 @@ namespace ianet
       const int err = errno;
 #endif
       native_socket_close(listen_sock);
-      return fail("bind failed: %d", err);
+      return fail("bind failed: {}", err);
     }
 
     if (protocol == EProtocolType::TCP)
@@ -84,36 +98,15 @@ namespace ianet
         const int err = errno;
 #endif
         native_socket_close(listen_sock);
-        return fail("listen failed: %d", err);
+        return fail("listen failed: {}", err);
       }
     }
 
-    HeapAllocator alloc;
-    void *mem = alloc.alloc(sizeof(SocketServer_T), alignof(SocketServer_T));
-    if (!mem)
-    {
-      native_socket_close(listen_sock);
-      return fail("failed to allocate server");
-    }
-
-    const auto server = new (mem) SocketServer_T();
+    auto server = make_box<SocketServer_T>();
     server->sock = listen_sock;
     server->protocol = protocol;
     server->port = port;
-
-    return Box<SocketServer_T, Deleter_SocketServer_T<HeapAllocator>>(server,
-                                                                      Deleter_SocketServer_T<HeapAllocator>(alloc));
-  }
-
-  auto __internal_destory_server(HeapAllocator *allocator, SocketServer_T *server) -> void
-  {
-    if (!server)
-      return;
-
-    native_socket_close(server->sock);
-
-    server->~SocketServer_T();
-    allocator->free(server, sizeof(SocketServer_T), alignof(SocketServer_T));
+    return server;
   }
 
   auto socket_server_accept(SocketServer &server) -> Result<Connection>
@@ -124,11 +117,11 @@ namespace ianet
 #if AU_PLATFORM_WINDOWS
     const NativeSocket client_sock = accept(server->sock, nullptr, nullptr);
     if (client_sock == INVALID_SOCKET)
-      return fail("accept failed: %d", WSAGetLastError());
+      return fail("accept failed: {}", WSAGetLastError());
 #else
     const NativeSocket client_sock = ::accept(server->sock, nullptr, nullptr);
     if (!native_socket_valid(client_sock))
-      return fail("accept failed: %d", errno);
+      return fail("accept failed: {}", errno);
 #endif
 
     auto conn = __connection_from_socket(client_sock);

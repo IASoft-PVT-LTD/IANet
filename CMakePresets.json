@@ -85,15 +85,6 @@
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/wasm32-emscripten-clang.cmake"
       }
-    },
-    {
-      "name": "ianet-x64-windows-cross",
-      "displayName": "ianet Windows x64 (Clang Cross Linux Host)",
-      "inherits": "x64-windows-cross",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-cross-clang.cmake"
-      }
     }
   ],
   "buildPresets": [
@@ -132,10 +123,6 @@
     {
       "name": "ianet-wasm32-emscripten",
       "configurePreset": "ianet-wasm32-emscripten"
-    },
-    {
-      "name": "ianet-x64-windows-cross",
-      "configurePreset": "ianet-x64-windows-cross"
     }
   ],
   "testPresets": [
