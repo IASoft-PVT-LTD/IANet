@@ -11,7 +11,7 @@
 </div>
 
 > [!NOTE]
-> IAUSB has been migrated to a module-only API.
+> IANet has been migrated to a module-only API.
 >
 > If you're a current license holder, you should have received an email from IASoft detailing the changes, alongside a full migration guide, a repository link for header-only API security updates and a rationale for this decision.
 >
