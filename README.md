@@ -22,70 +22,70 @@
 - **Cross-Platform:** Seamlessly supports both Windows (Winsock2) and Linux (POSIX sockets).
 - **Simple API:** Easy-to-use functions for managing contexts, clients, servers, and connections.
 - **Robust Error Handling:** Utilizes `Result<T>` for safe, exception-free error management.
-- **Modern C++:** C++23 modules (`import ianet` / `import ianet.http`), built on [Auxid](https://github.com/I-A-S/Auxid).
+- **Modern C++:** Built with modern C++ practices, custom allocators, and smart pointers.
 
 ## Quick start (CMake)
 
 You can easily integrate IANet into your project using CMake's `FetchContent`:
 
 ```cmake
-cmake_minimum_required(VERSION 3.28)
-project(my_app CXX)
-
 include(FetchContent)
+
 FetchContent_Declare(
-    ianet
-    GIT_REPOSITORY https://github.com/I-A-S/ianet.git
-    GIT_TAG        main # Or a specific release tag
+    IANET
+    GIT_REPOSITORY https://github.com/IASoft-PVT-LTD/IANet
+    GIT_TAG        main
 )
-FetchContent_MakeAvailable(ianet)
+FetchContent_MakeAvailable(IANET)
 
-add_executable(my_app main.cpp)
-target_link_libraries(my_app PRIVATE IANET)
-set_target_properties(my_app PROPERTIES CXX_SCAN_FOR_MODULES ON)
+# Link against your target
+target_link_libraries(your_target PRIVATE IANET)
 ```
-
-Requires C++23, CMake 3.28+, and a supported compiler (Clang, MSVC, or GCC 15.2+ via Auxid).
 
 ### Example
 
-Socket-only consumers use `import ianet;`. HTTP clients use `import ianet.http;` (re-exports `ianet` and Auxid).
+Here is a simple example demonstrating how to create a client, connect to a server, and send/receive data:
 
 ```cpp
-import ianet.http;
+#include <ianet/ianet.hpp>
+#include <auxid/core/main_thread.hpp>
+#include <auxid/core/logger.hpp>
 
 using namespace au;
-using namespace ianet;
 
 auto app_main() -> Result<void>
 {
-  auto ctx = AU_TRY(create_context());
-  auto client = AU_TRY(create_socket_client(ctx, EProtocolType::TCP));
-  auto conn = AU_TRY(socket_client_connect(client, String("127.0.0.1"), 8080));
+  // Create a networking context
+  auto ctx = AU_TRY(ianet::create_context());
 
+  // Create a client
+  auto client = AU_TRY(ianet::create_socket_client(ctx));
+
+  // Connect to a local server on port 8080
+  auto conn = AU_TRY(ianet::socket_client_connect(client, String("127.0.0.1"), 8080));
+
+  // Send a message
   const u8 msg[] = {'h', 'e', 'l', 'l', 'o'};
-  AU_TRY(connection_send(conn, Span<const u8>(msg, sizeof(msg))));
+  AU_TRY(ianet::connection_send(conn, Span<const u8>(msg, sizeof(msg))));
 
-  auto reply = AU_TRY(connection_receive(conn, 1024));
-  (void) reply;
+  // Receive a reply (up to 1024 bytes)
+  auto reply = AU_TRY(ianet::connection_receive(conn, 1024));
 
   return {};
 }
 
 int main(int argc, char *argv[])
 {
-  AU_UNUSED(argc);
-  AU_UNUSED(argv);
-
+  // Initialize the Auxid platform main thread
   auxid::MainThreadGuard _main_thread_guard;
-
+  
   const auto result = app_main();
   if (!result)
   {
-    auxid::get_thread_logger().error("Application failed with error: {}", result.error());
+    auxid::get_thread_logger().error("Application failed with error: %s", result.error().c_str());
     return 1;
   }
-
+  
   return 0;
 }
 ```
