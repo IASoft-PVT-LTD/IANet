@@ -1,3 +1,8 @@
+/**
+ * @file http.cpp
+ * @brief HTTP/1.x client, server, and message parse/serialize implementation.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)

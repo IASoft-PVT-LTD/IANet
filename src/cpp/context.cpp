@@ -1,3 +1,8 @@
+/**
+ * @file context.cpp
+ * @brief Implementation of @ref ianet::create_context.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)

@@ -1,3 +1,8 @@
+/**
+ * @file connection.cpp
+ * @brief Connection lifecycle, plain-socket I/O, and TLS session bridging.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)
@@ -28,12 +33,14 @@ module;
 
 #include <cstddef>
 
+/// @cond INTERNAL
 extern "C" {
 void ianet_tls_session_free(void *tls);
 int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
 int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
 void ianet_tls_format_error(int code, char *buf, size_t buf_len);
 }
+/// @endcond
 
 module ianet;
 
@@ -67,6 +74,7 @@ namespace ianet
     }
   } // namespace
 
+  /// @cond INTERNAL
   Connection_T::~Connection_T()
   {
     if (tls != nullptr)
@@ -127,6 +135,7 @@ namespace ianet
     connection->sock = sock;
     return connection;
   }
+  /// @endcond
 
   auto connection_send(Connection &connection, Span<const u8> data) -> Result<void>
   {

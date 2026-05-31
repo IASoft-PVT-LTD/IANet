@@ -6,3 +6,6 @@ out/
 sandbox/
 
 compile_commands.json
+
+docs/site/
+docs/site/assets/.doxy/

@@ -12,6 +12,13 @@ module;
 #include <auxid/macros.hpp>
 #include <utility>
 
+/**
+ * @file ianet.https.cppm
+ * @brief HTTPS convenience helpers combining HTTP and TLS modules.
+ *
+ * Wraps @ref ianet.http and @ref ianet.tls for common server/client setup patterns.
+ */
+
 export module ianet.https;
 export import ianet.http;
 export import ianet.tls;
@@ -20,14 +27,23 @@ export namespace ianet
 {
   using namespace au;
 
+  /// @cond INTERNAL
   struct HttpsServer_T
   {
     Box<SocketServer_T> sock_server;
     TlsContext *tls{};
   };
+  /// @endcond
 
+  /** @brief Opaque HTTPS server (TCP listener + TLS context reference). */
   using HttpsServer = Box<HttpsServer_T>;
 
+  /**
+   * @brief Creates an HTTPS server listening on @p port.
+   * @param ctx   Active networking context.
+   * @param port  Local TCP port.
+   * @param tls   Server TLS context (must outlive the server).
+   */
   inline auto create_https_server(Context &ctx, u16 port, TlsContext &tls) -> Result<HttpsServer>
   {
     auto sock_srv_r = create_socket_server(ctx, EProtocolType::TCP, port);
@@ -42,6 +58,11 @@ export namespace ianet
     return server;
   }
 
+  /**
+   * @brief Accepts an incoming HTTPS connection and completes the TLS handshake.
+   * @param server  HTTPS server from @ref create_https_server.
+   * @return An @ref HttpConnection ready for HTTP request/response I/O.
+   */
   inline auto https_server_accept(HttpsServer &server) -> Result<HttpConnection>
   {
     if (server->tls == nullptr)
@@ -57,6 +78,13 @@ export namespace ianet
     return http_conn;
   }
 
+  /**
+   * @brief Connects to a remote HTTPS host and completes the TLS handshake.
+   * @param client   HTTP client (currently unused; a transient client is created).
+   * @param address  IPv4 address string.
+   * @param port     Remote port.
+   * @param tls      Client TLS context.
+   */
   inline auto https_client_connect(HttpClient &client, const String &address, u16 port, TlsContext &tls)
       -> Result<HttpConnection>
   {

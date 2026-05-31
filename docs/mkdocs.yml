@@ -1,0 +1,40 @@
+site_name: IANet
+site_description: Cross-platform C++23 networking library
+docs_dir: docs
+use_directory_urls: true
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdoxy:
+      projects:
+        ianet:
+          src-dirs: ../src/modules ../src/cpp
+          full-doc: true
+          doxy-cfg-file: ../Doxyfile
+          doxy-cfg:
+            FILE_PATTERNS: "*.cppm *.cpp"
+            RECURSIVE: NO
+            EXTRACT_ALL: NO
+            INTERNAL_DOCS: NO
+            BUILTIN_STL_SUPPORT: YES
+            MARKDOWN_SUPPORT: YES
+
+nav:
+  - Home: index.md
+  - API Reference:
+      - Overview: ianet/links.md
+      - Core Module: ianet/ianet_8cppm.md
+      - HTTP Module: ianet/ianet_8http_8cppm.md
+      - TLS Module: ianet/ianet_8tls_8cppm.md
+      - HTTPS Module: ianet/ianet_8https_8cppm.md
+      - ianet Namespace: ianet/namespaceianet.md
+      - Namespaces: ianet/namespaces.md
+      - Classes: ianet/classes.md
+      - Namespace Functions: ianet/namespace_member_functions.md
+      - Files: ianet/files.md

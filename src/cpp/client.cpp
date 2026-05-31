@@ -1,3 +1,8 @@
+/**
+ * @file client.cpp
+ * @brief Implementation of socket client creation and connect.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)

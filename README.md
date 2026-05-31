@@ -61,7 +61,7 @@ auto app_main() -> Result<void>
   auto ctx = AU_TRY(ianet::create_context());
 
   // Create a client
-  auto client = AU_TRY(ianet::create_socket_client(ctx));
+  auto client = AU_TRY(ianet::create_socket_client(ctx, ianet::EProtocolType::TCP));
 
   // Connect to a local server on port 8080
   auto conn = AU_TRY(ianet::socket_client_connect(client, String("127.0.0.1"), 8080));
@@ -91,6 +91,23 @@ int main(int argc, char *argv[])
   return 0;
 }
 ```
+
+## Documentation
+
+Build and serve the MkDocs site (API reference is generated from Doxygen comments via mkdoxy):
+
+```bash
+pip install -r docs/requirements.txt
+cd docs && mkdocs serve          # http://127.0.0.1:8000
+```
+
+Or build via CMake (requires Doxygen and Python 3 on `PATH`):
+
+```bash
+cmake --build --preset <preset> --target docs
+```
+
+Output is written to `docs/site/`.
 
 ## License
 

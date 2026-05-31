@@ -28,12 +28,22 @@ module;
 
 #include <cstddef>
 
+/// @cond INTERNAL
 extern "C" {
 void ianet_tls_session_free(void *tls);
 int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
 int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
 void ianet_tls_format_error(int code, char *buf, size_t buf_len);
 }
+/// @endcond
+
+/**
+ * @file ianet.cppm
+ * @brief Core IANet module — cross-platform sockets and connections.
+ *
+ * Provides context lifecycle, TCP/UDP clients and servers, and byte-stream I/O.
+ * Re-exports the Auxid platform library (`export import auxid`).
+ */
 
 export module ianet;
 
@@ -44,11 +54,17 @@ export namespace ianet
   using namespace au;
 
 #if AU_PLATFORM_WINDOWS
+  /** @brief Platform-native socket handle (`SOCKET` on Windows). */
   using NativeSocket = SOCKET;
 #else
+  /** @brief Platform-native socket handle (file descriptor on Linux). */
   using NativeSocket = int;
 #endif
 
+  /**
+   * @brief Returns whether @p s is a usable socket handle.
+   * @param s Native socket handle to test.
+   */
   [[nodiscard]] inline auto native_socket_valid(NativeSocket s) -> bool
   {
 #if AU_PLATFORM_WINDOWS
@@ -58,6 +74,10 @@ export namespace ianet
 #endif
   }
 
+  /**
+   * @brief Closes @p s if it is currently valid.
+   * @param s Native socket handle to close.
+   */
   inline auto native_socket_close(NativeSocket s) -> void
   {
 #if AU_PLATFORM_WINDOWS
@@ -69,12 +89,14 @@ export namespace ianet
 #endif
   }
 
+  /** @brief Transport protocol for socket clients and servers. */
   enum class EProtocolType
   {
-    TCP = 0,
-    UDP = 1,
+    TCP = 0, ///< Connection-oriented stream sockets.
+    UDP = 1, ///< Datagram sockets (accept is not supported on UDP servers).
   };
 
+  /// @cond INTERNAL
   struct Context_T
   {
     ~Context_T()
@@ -109,24 +131,76 @@ export namespace ianet
 
     ~Connection_T();
   };
+  /// @endcond
 
+  /** @brief Opaque networking context (initializes Winsock on Windows). */
   using Context = Box<Context_T>;
+  /** @brief Opaque socket client handle. */
   using SocketClient = Box<SocketClient_T>;
+  /** @brief Opaque listening socket server handle. */
   using SocketServer = Box<SocketServer_T>;
+  /** @brief Opaque connected socket (plain or TLS-wrapped). */
   using Connection = Box<Connection_T>;
 
+  /**
+   * @brief Creates a networking context.
+   *
+   * On Windows, initializes Winsock; cleanup runs when the context is destroyed.
+   *
+   * @return A new context on success.
+   */
   auto create_context() -> Result<Context>;
 
+  /**
+   * @brief Creates a socket client for the given protocol.
+   * @param ctx   Active networking context.
+   * @param protocol  TCP or UDP.
+   * @return A new client handle on success.
+   */
   auto create_socket_client(Context &ctx, EProtocolType protocol) -> Result<SocketClient>;
+
+  /**
+   * @brief Creates and binds a listening socket server.
+   * @param ctx   Active networking context.
+   * @param protocol  TCP or UDP.
+   * @param port  Local port to bind (IPv4, all interfaces).
+   * @return A new server handle on success.
+   */
   auto create_socket_server(Context &ctx, EProtocolType protocol, u16 port) -> Result<SocketServer>;
 
+  /**
+   * @brief Connects a client to a remote IPv4 host.
+   * @param client  Client created with @ref create_socket_client.
+   * @param address IPv4 address string (e.g. `"127.0.0.1"`).
+   * @param port    Remote port.
+   * @return A connected @ref Connection on success.
+   */
   auto socket_client_connect(SocketClient &client, const String &address, u16 port) -> Result<Connection>;
+
+  /**
+   * @brief Accepts an incoming connection on a TCP server.
+   * @param server  TCP server created with @ref create_socket_server.
+   * @return A new @ref Connection for the accepted peer.
+   */
   auto socket_server_accept(SocketServer &server) -> Result<Connection>;
 
+  /**
+   * @brief Sends bytes on a connection (plain socket or TLS session).
+   * @param connection  Active connection.
+   * @param data        Bytes to send.
+   */
   auto connection_send(Connection &connection, Span<const u8> data) -> Result<void>;
+
+  /**
+   * @brief Receives up to @p size bytes from a connection.
+   * @param connection  Active connection.
+   * @param size        Maximum number of bytes to read.
+   * @return Received bytes (may be fewer than @p size).
+   */
   auto connection_receive(Connection &connection, usize size) -> Result<Vec<u8>>;
 } // namespace ianet
 
+/// @cond INTERNAL
 namespace ianet
 {
   using namespace au;
@@ -136,3 +210,4 @@ namespace ianet
   auto __tls_session_send(void *tls, Span<const u8> data) -> Result<void>;
   auto __tls_session_recv(void *tls, usize size) -> Result<Vec<u8>>;
 }
+/// @endcond

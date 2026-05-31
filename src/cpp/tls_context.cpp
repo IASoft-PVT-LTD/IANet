@@ -1,3 +1,8 @@
+/**
+ * @file tls_context.cpp
+ * @brief MbedTLS context setup, handshake, and encrypted I/O.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)
@@ -36,6 +41,7 @@ module;
 
 #include <cstddef>
 
+/// @cond INTERNAL
 extern "C" {
 
 void ianet_tls_session_free(void *tls)
@@ -116,6 +122,7 @@ int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *ou
 }
 
 } // extern "C"
+/// @endcond
 
 module ianet.tls;
 
@@ -383,6 +390,7 @@ namespace ianet
     }
   } // namespace
 
+  /// @cond INTERNAL
   TlsContext_T::~TlsContext_T()
   {
     delete static_cast<TlsContextImpl *>(impl);
@@ -408,6 +416,7 @@ namespace ianet
 
     return setup_tls_session(sock, *impl, hostname);
   }
+  /// @endcond
 
   auto create_tls_server_context(const TlsConfig &config) -> Result<TlsContext>
   {

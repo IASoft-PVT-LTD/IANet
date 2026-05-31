@@ -1,3 +1,8 @@
+/**
+ * @file server.cpp
+ * @brief Implementation of socket server bind/listen and accept.
+ */
+
 // IANet: Cross-Platform Networking Library for C++
 //
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)
