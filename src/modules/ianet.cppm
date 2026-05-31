@@ -26,6 +26,15 @@ module;
 #  include <unistd.h>
 #endif
 
+#include <cstddef>
+
+extern "C" {
+void ianet_tls_session_free(void *tls);
+int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
+int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
+void ianet_tls_format_error(int code, char *buf, size_t buf_len);
+}
+
 export module ianet;
 
 export import auxid;
@@ -96,11 +105,9 @@ export namespace ianet
   struct Connection_T
   {
     NativeSocket sock{};
+    void *tls{};
 
-    ~Connection_T()
-    {
-      native_socket_close(sock);
-    }
+    ~Connection_T();
   };
 
   using Context = Box<Context_T>;
@@ -124,4 +131,8 @@ namespace ianet
 {
   using namespace au;
   auto __connection_from_socket(NativeSocket sock) -> Result<Connection>;
+  auto __connection_attach_tls(Connection &connection, void *tls) -> void;
+  auto __connection_tls_free(void *tls) -> void;
+  auto __tls_session_send(void *tls, Span<const u8> data) -> Result<void>;
+  auto __tls_session_recv(void *tls, usize size) -> Result<Vec<u8>>;
 }

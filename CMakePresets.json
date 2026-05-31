@@ -61,7 +61,7 @@
     },
     {
       "name": "ianet-x64-windows",
-      "displayName": "ianet Windows x64 (Visual Studio 2022)",
+      "displayName": "ianet Windows x64 (Visual Studio 2026)",
       "inherits": "x64-windows",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -70,7 +70,7 @@
     },
     {
       "name": "ianet-arm64-windows",
-      "displayName": "ianet Windows ARM64 (Visual Studio 2022)",
+      "displayName": "ianet Windows ARM64 (Visual Studio 2026)",
       "inherits": "arm64-windows",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {

@@ -26,13 +26,24 @@ module;
 #  include <unistd.h>
 #endif
 
+#include <cstddef>
+
+extern "C" {
+void ianet_tls_session_free(void *tls);
+int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
+int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
+void ianet_tls_format_error(int code, char *buf, size_t buf_len);
+}
+
 module ianet;
 
 namespace ianet
 {
+  using namespace au;
+
   namespace
   {
-    auto send_all(NativeSocket s, Span<const u8> data) -> Result<void>
+    auto send_all_raw(NativeSocket s, Span<const u8> data) -> Result<void>
     {
       usize off = 0;
       while (off < data.size())
@@ -56,6 +67,57 @@ namespace ianet
     }
   } // namespace
 
+  Connection_T::~Connection_T()
+  {
+    if (tls != nullptr)
+      __connection_tls_free(tls);
+    native_socket_close(sock);
+  }
+
+  auto __connection_tls_free(void *tls) -> void
+  {
+    ianet_tls_session_free(tls);
+  }
+
+  auto __connection_attach_tls(Connection &connection, void *tls) -> void
+  {
+    connection->tls = tls;
+  }
+
+  auto __tls_session_send(void *tls, Span<const u8> data) -> Result<void>
+  {
+    const int ret = ianet_tls_session_send(tls, data.data(), data.size());
+    if (ret != 0)
+    {
+      char err_buf[128];
+      ianet_tls_format_error(ret, err_buf, sizeof(err_buf));
+      return fail("TLS send failed: {} ({})", ret, err_buf);
+    }
+
+    return Result<void>();
+  }
+
+  auto __tls_session_recv(void *tls, usize size) -> Result<Vec<u8>>
+  {
+    if (size == 0)
+      return Vec<u8>{};
+
+    Vec<u8> buf;
+    buf.resize(size);
+
+    size_t total = 0;
+    const int ret = ianet_tls_session_recv(tls, buf.data(), size, &total);
+    if (ret != 0)
+    {
+      char err_buf[128];
+      ianet_tls_format_error(ret, err_buf, sizeof(err_buf));
+      return fail("TLS recv failed: {} ({})", ret, err_buf);
+    }
+
+    buf.resize(total);
+    return buf;
+  }
+
   auto __connection_from_socket(NativeSocket sock) -> Result<Connection>
   {
     if (!native_socket_valid(sock))
@@ -68,11 +130,17 @@ namespace ianet
 
   auto connection_send(Connection &connection, Span<const u8> data) -> Result<void>
   {
-    return send_all(connection->sock, data);
+    if (connection->tls != nullptr)
+      return __tls_session_send(connection->tls, data);
+
+    return send_all_raw(connection->sock, data);
   }
 
   auto connection_receive(Connection &connection, usize size) -> Result<Vec<u8>>
   {
+    if (connection->tls != nullptr)
+      return __tls_session_recv(connection->tls, size);
+
     if (size == 0)
       return Vec<u8>{};
 

@@ -1,0 +1,88 @@
+// IANet: Cross-Platform Networking Library for C++
+//
+// Copyright (C) 2026 I-A-S (ias@iasoft.dev)
+// Copyright (C) 2026 IASoft (PVT) LTD (contact@iasoft.dev)
+//
+// This source code is licensed under the PolyForm Noncommercial License 1.0.0.
+// A copy of this license is included in the LICENSE file at the root of this project,
+// and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
+
+module;
+
+#include <auxid/macros.hpp>
+#include <utility>
+
+export module ianet.https;
+export import ianet.http;
+export import ianet.tls;
+
+export namespace ianet
+{
+  using namespace au;
+
+  struct HttpsServer_T
+  {
+    Box<SocketServer_T> sock_server;
+    TlsContext *tls{};
+  };
+
+  using HttpsServer = Box<HttpsServer_T>;
+
+  inline auto create_https_server(Context &ctx, u16 port, TlsContext &tls) -> Result<HttpsServer>
+  {
+    auto sock_srv_r = create_socket_server(ctx, EProtocolType::TCP, port);
+
+    if (sock_srv_r.is_err())
+      return fail("failed to create socket server: {}", sock_srv_r.error());
+
+    auto server = make_box<HttpsServer_T>();
+    server->sock_server = std::move(sock_srv_r.unwrap());
+    server->tls = &tls;
+
+    return server;
+  }
+
+  inline auto https_server_accept(HttpsServer &server) -> Result<HttpConnection>
+  {
+    if (server->tls == nullptr)
+      return fail("HTTPS server has no TLS context");
+
+    auto conn_r = tls_server_accept(server->sock_server, *server->tls);
+    if (conn_r.is_err())
+      return fail("failed to accept TLS connection: {}", conn_r.error());
+
+    auto http_conn = make_box<HttpConnection_T>();
+    http_conn->conn = std::move(conn_r.unwrap());
+
+    return http_conn;
+  }
+
+  inline auto https_client_connect(HttpClient &client, const String &address, u16 port, TlsContext &tls)
+      -> Result<HttpConnection>
+  {
+    (void) client;
+
+    auto ctx_r = create_context();
+    if (ctx_r.is_err())
+      return fail("failed to create context for https client connect");
+
+    auto connect_ctx = std::move(ctx_r.unwrap());
+
+    auto sock_cli_r = create_socket_client(connect_ctx, EProtocolType::TCP);
+
+    if (sock_cli_r.is_err())
+      return fail("failed to create socket client: {}", sock_cli_r.error());
+
+    auto sock_cli = std::move(sock_cli_r.unwrap());
+
+    auto conn_r = tls_client_connect(sock_cli, address, port, tls);
+
+    if (conn_r.is_err())
+      return fail("failed to connect: {}", conn_r.error());
+
+    auto http_conn = make_box<HttpConnection_T>();
+    http_conn->conn = std::move(conn_r.unwrap());
+
+    return http_conn;
+  }
+} // namespace ianet
