@@ -90,21 +90,6 @@ Browse the generated API pages from the navigation bar, or start with:
 - [API overview](ianet/links.md)
 - [ianet namespace](ianet/namespaceianet.md)
 
-## Building the docs locally
-
-```bash
-pip install -r docs/requirements.txt
-cd docs && mkdocs serve    # http://127.0.0.1:8000
-```
-
-Or via CMake (requires Doxygen and Python 3):
-
-```bash
-cmake --build --preset <preset> --target docs
-```
-
-Output is written to `docs/site/`.
-
 ## License
 
 Copyright © 2026 IASoft (PVT) LTD. Licensed under the

@@ -94,18 +94,7 @@ int main(int argc, char *argv[])
 
 ## Documentation
 
-Build and serve the MkDocs site (API reference is generated from Doxygen comments via mkdoxy):
-
-```bash
-pip install -r docs/requirements.txt
-cd docs && mkdocs serve          # http://127.0.0.1:8000
-```
-
-Or build via CMake (requires Doxygen and Python 3 on `PATH`):
-
-```bash
-cmake --build --preset <preset> --target docs
-```
+Find the documentation at [https://docs.iasoft.dev/ianet](https://docs.iasoft.dev/ianet)
 
 Output is written to `docs/site/`.
 
