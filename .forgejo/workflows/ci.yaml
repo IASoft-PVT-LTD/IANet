@@ -11,7 +11,7 @@ jobs:
   build-linux:
     runs-on: docker
     container:
-      image: catthehacker/ubuntu:runner-24.04
+      image: catthehacker/ubuntu:runner-26.04
     permissions:
       contents: read
     strategy:
@@ -32,16 +32,12 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 22
-          # Explicitly install LLVM's standard library
-          sudo apt-get install -y libc++-22-dev libc++abi-22-dev
           sudo ln -sf /usr/bin/clang-22   /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-22 /usr/bin/clang++
           clang --version
           clang++ --version
 
       - name: Configure
-        env:
-          CXXFLAGS: "-stdlib=libc++"
         run: cmake --preset ${{ matrix.target }}
 
       - name: Build
