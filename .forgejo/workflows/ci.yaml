@@ -12,7 +12,6 @@ jobs:
     runs-on: docker
     container:
       image: local-ubuntu-runner:26.04
-      options: --pull never
     permissions:
       contents: read
     strategy:
