@@ -11,7 +11,8 @@ jobs:
   build-linux:
     runs-on: docker
     container:
-      image: catthehacker/ubuntu:runner-26.04
+      image: local-ubuntu-runner:26.04
+      options: --pull never
     permissions:
       contents: read
     strategy:
