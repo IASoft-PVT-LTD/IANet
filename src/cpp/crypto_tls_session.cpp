@@ -53,6 +53,13 @@ namespace ianet::crypto::detail
       return {};
     }
 
+    auto configure_server_name_indication(SSL *ssl, const std::string &name) -> Result<void>
+    {
+      if (!name.empty() && !is_ip_address(name.c_str()) && SSL_set_tlsext_host_name(ssl, name.c_str()) != 1)
+        return std::unexpected(format_error("configure TLS server name indication"));
+      return {};
+    }
+
     auto verify_peer_identity(const Session &session, const X509 *certificate) -> Result<void>
     {
       for (const std::string &name : session.expected_peer_names)
@@ -68,8 +75,11 @@ namespace ianet::crypto::detail
   {
     if (!context.native)
       return std::unexpected(std::string("cannot create a TLS session from an empty context"));
-    if (context.role == Role::client && !valid_peer_name(expected_peer_name))
+    if (context.role == Role::client && context.peer_verification == PeerVerification::certificate_and_identity &&
+        !valid_peer_name(expected_peer_name))
       return std::unexpected(std::string("client TLS session requires a valid expected server name"));
+    if (context.role == Role::client && !expected_peer_name.empty() && !valid_peer_name(expected_peer_name))
+      return std::unexpected(std::string("client TLS session contains an invalid server name"));
     if (context.role == Role::server && !expected_peer_name.empty())
       return std::unexpected(std::string("server peer identities must be configured on the TLS context"));
 
@@ -90,18 +100,35 @@ namespace ianet::crypto::detail
     if (context.role == Role::client)
     {
       SSL_set_connect_state(ssl.get());
-      expected_names.emplace_back(expected_peer_name);
-      auto identity_result = configure_client_identity(ssl.get(), expected_names.front());
-      if (!identity_result)
-        return std::unexpected(std::move(identity_result.error()));
+      if (context.peer_verification == PeerVerification::certificate_and_identity)
+      {
+        expected_names.emplace_back(expected_peer_name);
+        auto identity_result = configure_client_identity(ssl.get(), expected_names.front());
+        if (!identity_result)
+          return std::unexpected(std::move(identity_result.error()));
+      }
+      else
+      {
+        auto sni_result = configure_server_name_indication(ssl.get(), std::string(expected_peer_name));
+        if (!sni_result)
+          return std::unexpected(std::move(sni_result.error()));
+      }
     }
     else
     {
       SSL_set_accept_state(ssl.get());
-      expected_names = context.allowed_peer_names;
+      if (context.peer_verification == PeerVerification::certificate_and_identity)
+        expected_names = context.allowed_peer_names;
     }
 
-    Session session{std::move(ssl), nullptr, nullptr, context.role, context.profile, std::move(expected_names), false};
+    Session session{std::move(ssl),
+                    nullptr,
+                    nullptr,
+                    context.role,
+                    context.peer_verification,
+                    context.profile,
+                    std::move(expected_names),
+                    false};
     session.inbound = SSL_get_rbio(session.native.get());
     session.outbound = SSL_get_wbio(session.native.get());
     clear_errors();
@@ -124,17 +151,22 @@ namespace ianet::crypto::detail
     const SSL_CIPHER *cipher = SSL_get_current_cipher(session.native.get());
     if (cipher == nullptr || session.profile.cipher_suite != SSL_CIPHER_get_name(cipher))
       return std::unexpected(std::string("TLS peer negotiated a disallowed cipher suite"));
-    if (SSL_get_verify_result(session.native.get()) != X509_V_OK)
+    if (session.peer_verification != PeerVerification::none && SSL_get_verify_result(session.native.get()) != X509_V_OK)
       return std::unexpected(std::string("TLS peer certificate verification failed"));
     if (SSL_session_reused(session.native.get()) != 0)
       return std::unexpected(std::string("TLS session resumption is disabled"));
     if (SSL_early_data_accepted(session.native.get()) != 0)
       return std::unexpected(std::string("TLS early data is disabled"));
 
-    X509Ptr peer_certificate(SSL_get_peer_certificate(session.native.get()));
-    if (!peer_certificate)
-      return std::unexpected(std::string("TLS peer did not provide a certificate"));
-    return verify_peer_identity(session, peer_certificate.get());
+    if (session.peer_verification != PeerVerification::none)
+    {
+      X509Ptr peer_certificate(SSL_get_peer_certificate(session.native.get()));
+      if (!peer_certificate)
+        return std::unexpected(std::string("TLS peer did not provide a certificate"));
+      if (session.peer_verification == PeerVerification::certificate_and_identity)
+        return verify_peer_identity(session, peer_certificate.get());
+    }
+    return {};
   }
 
   auto handshake_step(Session &session) -> Result<HandshakeState>

@@ -29,11 +29,13 @@ module;
 #include <cstddef>
 
 /// @cond INTERNAL
-extern "C" {
-void ianet_tls_session_free(void *tls);
-int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
-int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
-void ianet_tls_format_error(int code, char *buf, size_t buf_len);
+extern "C"
+{
+  void ianet_tls_session_free(void *tls);
+  int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len, char *error_buffer,
+                             size_t error_buffer_size);
+  int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read, char *error_buffer,
+                             size_t error_buffer_size);
 }
 /// @endcond
 
@@ -131,6 +133,7 @@ export namespace ianet
 
     ~Connection_T();
   };
+
   /// @endcond
 
   /** @brief Opaque networking context (initializes Winsock on Windows). */
@@ -209,5 +212,6 @@ namespace ianet
   auto __connection_tls_free(void *tls) -> void;
   auto __tls_session_send(void *tls, Span<const u8> data) -> Result<void>;
   auto __tls_session_recv(void *tls, usize size) -> Result<Vec<u8>>;
-}
+} // namespace ianet
+
 /// @endcond

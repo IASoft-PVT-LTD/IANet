@@ -27,6 +27,14 @@ export namespace ianet::crypto
     server,
   };
 
+  /** @brief Peer-authentication policy applied by the TLS context. */
+  enum class TlsPeerVerification
+  {
+    none,
+    certificate,
+    certificate_and_identity,
+  };
+
   enum class TlsHandshakeState
   {
     needs_input,
@@ -72,6 +80,7 @@ export namespace ianet::crypto
   struct TlsContextConfig
   {
     TlsRole role{};
+    TlsPeerVerification peer_verification{TlsPeerVerification::certificate_and_identity};
     TlsCredentials credentials;
     TlsProfile profile;
     Vec<String> allowed_peer_names;

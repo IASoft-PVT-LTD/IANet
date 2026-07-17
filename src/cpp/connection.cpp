@@ -34,11 +34,12 @@ module;
 #include <cstddef>
 
 /// @cond INTERNAL
-extern "C" {
-void ianet_tls_session_free(void *tls);
-int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len);
-int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read);
-void ianet_tls_format_error(int code, char *buf, size_t buf_len);
+extern "C"
+{
+  void ianet_tls_session_free(void *tls);
+  int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len, char *error_buf, size_t error_buf_len);
+  int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read, char *error_buf,
+                             size_t error_buf_len);
 }
 /// @endcond
 
@@ -94,13 +95,10 @@ namespace ianet
 
   auto __tls_session_send(void *tls, Span<const u8> data) -> Result<void>
   {
-    const int ret = ianet_tls_session_send(tls, data.data(), data.size());
+    char err_buf[256]{};
+    const int ret = ianet_tls_session_send(tls, data.data(), data.size(), err_buf, sizeof(err_buf));
     if (ret != 0)
-    {
-      char err_buf[128];
-      ianet_tls_format_error(ret, err_buf, sizeof(err_buf));
-      return fail("TLS send failed: {} ({})", ret, err_buf);
-    }
+      return fail("TLS send failed: {}", err_buf);
 
     return Result<void>();
   }
@@ -114,13 +112,10 @@ namespace ianet
     buf.resize(size);
 
     size_t total = 0;
-    const int ret = ianet_tls_session_recv(tls, buf.data(), size, &total);
+    char err_buf[256]{};
+    const int ret = ianet_tls_session_recv(tls, buf.data(), size, &total, err_buf, sizeof(err_buf));
     if (ret != 0)
-    {
-      char err_buf[128];
-      ianet_tls_format_error(ret, err_buf, sizeof(err_buf));
-      return fail("TLS recv failed: {} ({})", ret, err_buf);
-    }
+      return fail("TLS recv failed: {}", err_buf);
 
     buf.resize(total);
     return buf;
@@ -135,6 +130,7 @@ namespace ianet
     connection->sock = sock;
     return connection;
   }
+
   /// @endcond
 
   auto connection_send(Connection &connection, Span<const u8> data) -> Result<void>

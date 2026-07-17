@@ -1,22 +1,11 @@
 /**
  * @file tls_context.cpp
- * @brief MbedTLS context setup, handshake, and encrypted I/O.
+ * @brief Socket-attached TLS compatibility API implemented through ianet.crypto.
  */
-
-// IANet: Cross-Platform Networking Library for C++
-//
-// Copyright (C) 2026 I-A-S (ias@iasoft.dev)
-// Copyright (C) 2026 IASoft (PVT) LTD (contact@iasoft.dev)
-//
-// This source code is licensed under the PolyForm Noncommercial License 1.0.0.
-// A copy of this license is included in the LICENSE file at the root of this project,
-// and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
 module;
 
 #include <auxid/macros.hpp>
-#include <cstring>
-#include <utility>
 
 #if AU_PLATFORM_WINDOWS
 #  ifndef NOMINMAX
@@ -31,462 +20,422 @@ module;
 #  include <unistd.h>
 #endif
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/error.h>
-#include <mbedtls/net_sockets.h>
-#include <mbedtls/pk.h>
-#include <mbedtls/ssl.h>
-#include <mbedtls/x509_crt.h>
-
+#include <algorithm>
+#include <array>
 #include <cstddef>
-
-/// @cond INTERNAL
-extern "C" {
-
-void ianet_tls_session_free(void *tls)
-{
-  if (tls == nullptr)
-    return;
-
-  auto *ssl = static_cast<mbedtls_ssl_context *>(tls);
-  mbedtls_ssl_free(ssl);
-  delete ssl;
-}
-
-void ianet_tls_format_error(int code, char *buf, size_t buf_len)
-{
-  if (buf == nullptr || buf_len == 0)
-    return;
-
-  mbedtls_strerror(code, buf, buf_len);
-}
-
-int ianet_tls_session_send(void *tls, const unsigned char *data, size_t len)
-{
-  if (tls == nullptr || data == nullptr)
-    return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
-
-  auto *ssl = static_cast<mbedtls_ssl_context *>(tls);
-
-  size_t off = 0;
-  while (off < len)
-  {
-    const int written = mbedtls_ssl_write(ssl, data + off, len - off);
-    if (written <= 0)
-    {
-      if (written == MBEDTLS_ERR_SSL_WANT_READ || written == MBEDTLS_ERR_SSL_WANT_WRITE)
-        continue;
-
-      return written;
-    }
-
-    off += static_cast<size_t>(written);
-  }
-
-  return 0;
-}
-
-int ianet_tls_session_recv(void *tls, unsigned char *buf, size_t len, size_t *out_read)
-{
-  if (out_read == nullptr)
-    return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
-
-  *out_read = 0;
-
-  if (tls == nullptr || buf == nullptr)
-    return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
-
-  if (len == 0)
-    return 0;
-
-  auto *ssl = static_cast<mbedtls_ssl_context *>(tls);
-
-  while (true)
-  {
-    const int read = mbedtls_ssl_read(ssl, buf, len);
-    if (read == MBEDTLS_ERR_SSL_WANT_READ || read == MBEDTLS_ERR_SSL_WANT_WRITE)
-      continue;
-
-    if (read <= 0)
-    {
-      if (read == 0 || read == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY)
-        return 0;
-
-      return read;
-    }
-
-    *out_read = static_cast<size_t>(read);
-    return 0;
-  }
-}
-
-} // extern "C"
-/// @endcond
+#include <cstring>
+#include <memory>
+#include <new>
+#include <string>
+#include <utility>
 
 module ianet.tls;
+
+import ianet.crypto;
+
+namespace
+{
+  using namespace au;
+  namespace tls = ianet::crypto;
+
+  constexpr usize MAX_PUMP_STEPS = 512U;
+  constexpr usize MAX_HANDSHAKE_CIPHERTEXT = 4U * 1024U * 1024U;
+  constexpr const char *DEFAULT_GROUP = "X25519MLKEM768";
+  constexpr const char *DEFAULT_CIPHER = "TLS_CHACHA20_POLY1305_SHA256";
+
+  struct SocketTlsContext
+  {
+    tls::TlsContext context;
+    bool is_server{};
+    String expected_peer_name;
+  };
+
+  struct SocketTlsSession
+  {
+    tls::TlsSession session;
+    ianet::NativeSocket *socket{};
+  };
+
+  auto to_std_string(const String &value) -> std::string
+  {
+    return std::string(value.data(), value.size());
+  }
+
+  auto copy_error(char *buffer, std::size_t buffer_size, const std::string &error) -> void
+  {
+    if (buffer == nullptr || buffer_size == 0U)
+      return;
+    const std::size_t size = std::min(buffer_size - 1U, error.size());
+    std::memcpy(buffer, error.data(), size);
+    buffer[size] = '\0';
+  }
+
+  auto raw_send_all(ianet::NativeSocket socket, Span<const u8> data) -> Result<void>
+  {
+    usize offset = 0U;
+    while (offset < data.size())
+    {
+#if AU_PLATFORM_WINDOWS
+      const usize remaining = data.size() - offset;
+      const int chunk = remaining > static_cast<usize>(INT_MAX) ? INT_MAX : static_cast<int>(remaining);
+      const int sent = send(socket, reinterpret_cast<const char *>(data.data() + offset), chunk, 0);
+      if (sent == SOCKET_ERROR)
+        return fail("TLS socket send failed: {}", WSAGetLastError());
+#else
+      const ssize_t sent = ::send(socket, data.data() + offset, data.size() - offset, MSG_NOSIGNAL);
+      if (sent < 0)
+      {
+        if (errno == EINTR)
+          continue;
+        return fail("TLS socket send failed: {}", errno);
+      }
+#endif
+      if (sent == 0)
+        return fail("TLS socket send returned zero");
+      offset += static_cast<usize>(sent);
+    }
+    return Result<void>();
+  }
+
+  auto flush_ciphertext(SocketTlsSession &session) -> Result<usize>
+  {
+    usize total = 0U;
+    while (tls::pending_tls_ciphertext(session.session) != 0U)
+    {
+      auto result = tls::take_tls_ciphertext(session.session);
+      if (result.is_err())
+        return fail(result.error());
+      auto ciphertext = std::move(result.unwrap());
+      if (ciphertext.empty())
+        return fail("TLS output reported pending ciphertext but returned none");
+      auto send_result = raw_send_all(*session.socket, Span<const u8>(ciphertext.data(), ciphertext.size()));
+      if (send_result.is_err())
+        return fail(send_result.error());
+      total += ciphertext.size();
+    }
+    return total;
+  }
+
+  auto receive_ciphertext(SocketTlsSession &session) -> Result<usize>
+  {
+    std::array<u8, tls::MAX_TLS_CIPHERTEXT_CHUNK_SIZE> buffer{};
+#if AU_PLATFORM_WINDOWS
+    const int received =
+        recv(*session.socket, reinterpret_cast<char *>(buffer.data()), static_cast<int>(buffer.size()), 0);
+    if (received == SOCKET_ERROR)
+      return fail("TLS socket receive failed: {}", WSAGetLastError());
+#else
+    ssize_t received = -1;
+    do
+    {
+      received = ::recv(*session.socket, buffer.data(), buffer.size(), 0);
+    } while (received < 0 && errno == EINTR);
+    if (received < 0)
+      return fail("TLS socket receive failed: {}", errno);
+#endif
+    if (received == 0)
+      return fail("TLS socket closed without close_notify");
+    auto result =
+        tls::provide_tls_ciphertext(session.session, Span<const u8>(buffer.data(), static_cast<usize>(received)));
+    if (result.is_err())
+      return fail(result.error());
+    return static_cast<usize>(received);
+  }
+
+  auto pump_handshake(SocketTlsSession &session) -> Result<void>
+  {
+    usize received_total = 0U;
+    for (usize step = 0U; step < MAX_PUMP_STEPS; ++step)
+    {
+      auto handshake = tls::tls_handshake_step(session.session);
+      if (handshake.is_err())
+        return fail(handshake.error());
+      auto flushed = flush_ciphertext(session);
+      if (flushed.is_err())
+        return fail(flushed.error());
+      if (handshake.unwrap() == tls::TlsHandshakeState::complete)
+        return Result<void>();
+      if (handshake.unwrap() == tls::TlsHandshakeState::needs_output)
+      {
+        if (flushed.unwrap() == 0U)
+          return fail("TLS handshake requested output without producing ciphertext");
+        continue;
+      }
+      auto received = receive_ciphertext(session);
+      if (received.is_err())
+        return fail(received.error());
+      received_total += received.unwrap();
+      if (received_total > MAX_HANDSHAKE_CIPHERTEXT)
+        return fail("TLS handshake exceeded ciphertext limit");
+    }
+    return fail("TLS handshake exceeded progress limit");
+  }
+
+  auto send_plaintext(SocketTlsSession &session, Span<const u8> plaintext) -> Result<void>
+  {
+    usize offset = 0U;
+    usize stalled = 0U;
+    while (offset < plaintext.size())
+    {
+      auto write = tls::tls_write_step(session.session, plaintext.subspan(offset));
+      if (write.is_err())
+        return fail(write.error());
+      const tls::TlsIoResult io = write.unwrap();
+      offset += io.size;
+      auto flushed = flush_ciphertext(session);
+      if (flushed.is_err())
+        return fail(flushed.error());
+      if (io.state == tls::TlsIoState::closed)
+        return fail("TLS peer closed during write");
+      if (io.state == tls::TlsIoState::needs_input)
+      {
+        auto received = receive_ciphertext(session);
+        if (received.is_err())
+          return fail(received.error());
+      }
+      else if (io.state == tls::TlsIoState::needs_output && flushed.unwrap() == 0U)
+      {
+        return fail("TLS write requested output without producing ciphertext");
+      }
+
+      const bool progress = io.size != 0U || flushed.unwrap() != 0U;
+      stalled = progress ? 0U : stalled + 1U;
+      if (stalled > MAX_PUMP_STEPS)
+        return fail("TLS write exceeded progress limit");
+    }
+    return Result<void>();
+  }
+
+  auto receive_plaintext(SocketTlsSession &session, Span<u8> plaintext, usize &read_size) -> Result<void>
+  {
+    read_size = 0U;
+    if (plaintext.empty())
+      return Result<void>();
+    for (;;)
+    {
+      auto read = tls::tls_read_step(session.session, plaintext);
+      if (read.is_err())
+        return fail(read.error());
+      const tls::TlsIoResult io = read.unwrap();
+      auto flushed = flush_ciphertext(session);
+      if (flushed.is_err())
+        return fail(flushed.error());
+      if (io.state == tls::TlsIoState::complete)
+      {
+        read_size = io.size;
+        return Result<void>();
+      }
+      if (io.state == tls::TlsIoState::closed)
+        return Result<void>();
+      if (io.state == tls::TlsIoState::needs_input)
+      {
+        auto received = receive_ciphertext(session);
+        if (received.is_err())
+          return fail(received.error());
+      }
+      else if (flushed.unwrap() == 0U)
+      {
+        return fail("TLS read requested output without producing ciphertext");
+      }
+    }
+  }
+
+  auto close_session(SocketTlsSession &session) -> Result<void>
+  {
+    auto shutdown = tls::tls_shutdown_step(session.session);
+    if (shutdown.is_err())
+      return fail(shutdown.error());
+    auto flushed = flush_ciphertext(session);
+    if (flushed.is_err())
+      return fail(flushed.error());
+    return Result<void>();
+  }
+
+  auto make_profile() -> tls::TlsProfile
+  {
+    return tls::TlsProfile{
+        .key_exchange_group = String(DEFAULT_GROUP),
+        .cipher_suite = String(DEFAULT_CIPHER),
+    };
+  }
+} // namespace
+
+/// @cond INTERNAL
+extern "C"
+{
+  void ianet_tls_session_free(void *tls_session)
+  {
+    if (tls_session == nullptr)
+      return;
+    auto *session = static_cast<SocketTlsSession *>(tls_session);
+    (void) close_session(*session);
+    delete session;
+  }
+
+  int ianet_tls_session_send(void *tls_session, const unsigned char *data, size_t length, char *error_buffer,
+                             size_t error_buffer_size)
+  {
+    if (tls_session == nullptr || (data == nullptr && length != 0U))
+    {
+      copy_error(error_buffer, error_buffer_size, "invalid TLS send arguments");
+      return -1;
+    }
+    auto *session = static_cast<SocketTlsSession *>(tls_session);
+    auto result = send_plaintext(*session, Span<const u8>(data, length));
+    if (result.is_err())
+    {
+      copy_error(error_buffer, error_buffer_size, to_std_string(result.error()));
+      return -1;
+    }
+    return 0;
+  }
+
+  int ianet_tls_session_recv(void *tls_session, unsigned char *buffer, size_t length, size_t *out_read,
+                             char *error_buffer, size_t error_buffer_size)
+  {
+    if (tls_session == nullptr || out_read == nullptr || (buffer == nullptr && length != 0U))
+    {
+      copy_error(error_buffer, error_buffer_size, "invalid TLS receive arguments");
+      return -1;
+    }
+    auto *session = static_cast<SocketTlsSession *>(tls_session);
+    usize read_size = 0U;
+    auto result = receive_plaintext(*session, Span<u8>(buffer, length), read_size);
+    if (result.is_err())
+    {
+      copy_error(error_buffer, error_buffer_size, to_std_string(result.error()));
+      return -1;
+    }
+    *out_read = read_size;
+    return 0;
+  }
+}
+
+/// @endcond
 
 namespace ianet
 {
   using namespace au;
 
-  namespace
-  {
-    struct MbedTlsGlobal
-    {
-      mbedtls_entropy_context entropy{};
-      mbedtls_ctr_drbg_context ctr_drbg{};
-
-      MbedTlsGlobal()
-      {
-        mbedtls_entropy_init(&entropy);
-        mbedtls_ctr_drbg_init(&ctr_drbg);
-
-        const char pers[] = "ianet";
-        const int seed_ret = mbedtls_ctr_drbg_seed(
-            &ctr_drbg, mbedtls_entropy_func, &entropy, reinterpret_cast<const unsigned char *>(pers),
-            sizeof(pers) - 1);
-        if (seed_ret != 0)
-          au::panic_at("mbedtls_ctr_drbg_seed failed", __FILE__, __LINE__);
-      }
-
-      ~MbedTlsGlobal()
-      {
-        mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
-      }
-
-      MbedTlsGlobal(const MbedTlsGlobal &) = delete;
-      auto operator=(const MbedTlsGlobal &) -> MbedTlsGlobal & = delete;
-    };
-
-    auto get_mbedtls_global() -> MbedTlsGlobal &
-    {
-      static MbedTlsGlobal global;
-      return global;
-    }
-
-    struct TlsContextImpl
-    {
-      mbedtls_ssl_config conf{};
-      mbedtls_x509_crt own_cert{};
-      mbedtls_pk_context own_key{};
-      mbedtls_x509_crt ca_chain{};
-      bool is_server{false};
-
-      TlsContextImpl()
-      {
-        mbedtls_ssl_config_init(&conf);
-        mbedtls_x509_crt_init(&own_cert);
-        mbedtls_pk_init(&own_key);
-        mbedtls_x509_crt_init(&ca_chain);
-      }
-
-      ~TlsContextImpl()
-      {
-        mbedtls_ssl_config_free(&conf);
-        mbedtls_x509_crt_free(&own_cert);
-        mbedtls_pk_free(&own_key);
-        mbedtls_x509_crt_free(&ca_chain);
-      }
-
-      TlsContextImpl(const TlsContextImpl &) = delete;
-      auto operator=(const TlsContextImpl &) -> TlsContextImpl & = delete;
-    };
-
-    auto tls_bio_send(void *ctx, const unsigned char *buf, size_t len) -> int
-    {
-      auto *sock = static_cast<NativeSocket *>(ctx);
-
-#if AU_PLATFORM_WINDOWS
-      const int chunk = len > static_cast<size_t>(INT_MAX) ? INT_MAX : static_cast<int>(len);
-      const int sent = send(*sock, reinterpret_cast<const char *>(buf), chunk, 0);
-      if (sent == SOCKET_ERROR)
-      {
-        const int err = WSAGetLastError();
-        if (err == WSAEWOULDBLOCK)
-          return MBEDTLS_ERR_SSL_WANT_WRITE;
-        return MBEDTLS_ERR_NET_SEND_FAILED;
-      }
-      return sent;
-#else
-      const ssize_t sent = ::send(*sock, reinterpret_cast<const char *>(buf), len, 0);
-      if (sent < 0)
-      {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-          return MBEDTLS_ERR_SSL_WANT_WRITE;
-        return MBEDTLS_ERR_NET_SEND_FAILED;
-      }
-      return static_cast<int>(sent);
-#endif
-    }
-
-    auto tls_bio_recv(void *ctx, unsigned char *buf, size_t len) -> int
-    {
-      auto *sock = static_cast<NativeSocket *>(ctx);
-
-#if AU_PLATFORM_WINDOWS
-      const int chunk = len > static_cast<size_t>(INT_MAX) ? INT_MAX : static_cast<int>(len);
-      const int received = recv(*sock, reinterpret_cast<char *>(buf), chunk, 0);
-      if (received == SOCKET_ERROR)
-      {
-        const int err = WSAGetLastError();
-        if (err == WSAEWOULDBLOCK)
-          return MBEDTLS_ERR_SSL_WANT_READ;
-        return MBEDTLS_ERR_NET_RECV_FAILED;
-      }
-      if (received == 0)
-        return MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY;
-      return received;
-#else
-      const ssize_t received = ::recv(*sock, reinterpret_cast<char *>(buf), len, 0);
-      if (received < 0)
-      {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-          return MBEDTLS_ERR_SSL_WANT_READ;
-        return MBEDTLS_ERR_NET_RECV_FAILED;
-      }
-      if (received == 0)
-        return MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY;
-      return static_cast<int>(received);
-#endif
-    }
-
-    auto tls_do_handshake(mbedtls_ssl_context &ssl) -> Result<void>
-    {
-      int ret = 0;
-      while ((ret = mbedtls_ssl_handshake(&ssl)) != 0)
-      {
-        if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)
-          continue;
-
-        char err_buf[128];
-        mbedtls_strerror(ret, err_buf, sizeof(err_buf));
-        return fail("TLS handshake failed: {} ({})", ret, err_buf);
-      }
-
-      return Result<void>();
-    }
-
-    auto setup_tls_session(NativeSocket *sock, TlsContextImpl &ctx, const char *hostname) -> Result<void *>
-    {
-      if (sock == nullptr)
-        return fail("invalid socket for TLS session");
-
-      auto *ssl = new mbedtls_ssl_context();
-      mbedtls_ssl_init(ssl);
-
-      int ret = mbedtls_ssl_setup(ssl, &ctx.conf);
-      if (ret != 0)
-      {
-        mbedtls_ssl_free(ssl);
-        delete ssl;
-        return fail("mbedtls_ssl_setup failed: {}", ret);
-      }
-
-      if (hostname != nullptr && hostname[0] != '\0')
-      {
-        ret = mbedtls_ssl_set_hostname(ssl, hostname);
-        if (ret != 0)
-        {
-          mbedtls_ssl_free(ssl);
-          delete ssl;
-          return fail("mbedtls_ssl_set_hostname failed: {}", ret);
-        }
-      }
-
-      mbedtls_ssl_set_bio(ssl, sock, tls_bio_send, tls_bio_recv, nullptr);
-
-      auto hs_r = tls_do_handshake(*ssl);
-      if (hs_r.is_err())
-      {
-        mbedtls_ssl_free(ssl);
-        delete ssl;
-        return fail("{}", hs_r.error());
-      }
-
-      return ssl;
-    }
-
-    auto load_pem_cert(mbedtls_x509_crt &chain, const String &path) -> Result<void>
-    {
-      if (path.empty())
-        return fail("certificate path is empty");
-
-      const int ret = mbedtls_x509_crt_parse_file(&chain, path.c_str());
-      if (ret != 0)
-        return fail("failed to parse certificate '{}': {}", path, ret);
-
-      return Result<void>();
-    }
-
-    auto load_pem_key(mbedtls_pk_context &key, const String &path) -> Result<void>
-    {
-      if (path.empty())
-        return fail("private key path is empty");
-
-      const int ret = mbedtls_pk_parse_keyfile(&key, path.c_str(), nullptr, mbedtls_ctr_drbg_random,
-                                               &get_mbedtls_global().ctr_drbg);
-      if (ret != 0)
-        return fail("failed to parse private key '{}': {}", path, ret);
-
-      return Result<void>();
-    }
-
-    auto configure_tls_context(TlsContextImpl &impl, const TlsConfig &config, bool is_server) -> Result<void>
-    {
-      impl.is_server = is_server;
-
-      const int endpoint = is_server ? MBEDTLS_SSL_IS_SERVER : MBEDTLS_SSL_IS_CLIENT;
-      int ret = mbedtls_ssl_config_defaults(&impl.conf, endpoint, MBEDTLS_SSL_TRANSPORT_STREAM,
-                                            MBEDTLS_SSL_PRESET_DEFAULT);
-      if (ret != 0)
-        return fail("mbedtls_ssl_config_defaults failed: {}", ret);
-
-      mbedtls_ssl_conf_rng(&impl.conf, mbedtls_ctr_drbg_random, &get_mbedtls_global().ctr_drbg);
-
-      if (is_server)
-      {
-        mbedtls_ssl_conf_authmode(&impl.conf, MBEDTLS_SSL_VERIFY_NONE);
-
-        if (config.cert_file.empty() || config.key_file.empty())
-          return fail("server TLS requires cert_file and key_file");
-
-        AU_TRY_DISCARD(load_pem_cert(impl.own_cert, config.cert_file));
-        AU_TRY_DISCARD(load_pem_key(impl.own_key, config.key_file));
-        mbedtls_ssl_conf_own_cert(&impl.conf, &impl.own_cert, &impl.own_key);
-
-        if (!config.ca_file.empty() && config.verify_mode == ETlsVerifyMode::Required)
-        {
-          AU_TRY_DISCARD(load_pem_cert(impl.ca_chain, config.ca_file));
-          mbedtls_ssl_conf_ca_chain(&impl.conf, &impl.ca_chain, nullptr);
-          mbedtls_ssl_conf_authmode(&impl.conf, MBEDTLS_SSL_VERIFY_REQUIRED);
-        }
-      }
-      else
-      {
-        const int verify = config.verify_mode == ETlsVerifyMode::Required ? MBEDTLS_SSL_VERIFY_REQUIRED
-                                                                          : MBEDTLS_SSL_VERIFY_NONE;
-        mbedtls_ssl_conf_authmode(&impl.conf, verify);
-
-        if (config.verify_mode == ETlsVerifyMode::Required)
-        {
-          if (config.ca_file.empty())
-            return fail("client TLS verification requires ca_file");
-
-          AU_TRY_DISCARD(load_pem_cert(impl.ca_chain, config.ca_file));
-          mbedtls_ssl_conf_ca_chain(&impl.conf, &impl.ca_chain, nullptr);
-        }
-
-        if (!config.cert_file.empty() && !config.key_file.empty())
-        {
-          AU_TRY_DISCARD(load_pem_cert(impl.own_cert, config.cert_file));
-          AU_TRY_DISCARD(load_pem_key(impl.own_key, config.key_file));
-          mbedtls_ssl_conf_own_cert(&impl.conf, &impl.own_cert, &impl.own_key);
-        }
-      }
-
-      return Result<void>();
-    }
-  } // namespace
-
-  /// @cond INTERNAL
   TlsContext_T::~TlsContext_T()
   {
-    delete static_cast<TlsContextImpl *>(impl);
+    delete static_cast<SocketTlsContext *>(impl);
     impl = nullptr;
   }
 
   auto __tls_context_impl(TlsContext &tls) -> void *
   {
-    return tls->impl;
+    return tls ? tls->impl : nullptr;
   }
 
   auto __tls_context_is_server(TlsContext &tls) -> bool
   {
-    auto *impl = static_cast<TlsContextImpl *>(tls->impl);
+    auto *impl = static_cast<SocketTlsContext *>(__tls_context_impl(tls));
     return impl != nullptr && impl->is_server;
   }
 
-  auto __setup_tls_session(NativeSocket *sock, TlsContext &tls, const char *hostname) -> Result<void *>
+  auto __setup_tls_session(NativeSocket *socket, TlsContext &tls_context, const String &peer_name) -> Result<void *>
   {
-    auto *impl = static_cast<TlsContextImpl *>(__tls_context_impl(tls));
-    if (impl == nullptr)
-      return fail("invalid TLS context");
+    auto *context = static_cast<SocketTlsContext *>(__tls_context_impl(tls_context));
+    if (socket == nullptr || context == nullptr)
+      return fail("invalid TLS socket or context");
 
-    return setup_tls_session(sock, *impl, hostname);
+    auto session_result = crypto::create_tls_session(context->context, peer_name);
+    if (session_result.is_err())
+      return fail(session_result.error());
+    auto session = std::unique_ptr<SocketTlsSession>(new (std::nothrow)
+                                                         SocketTlsSession{std::move(session_result.unwrap()), socket});
+    if (!session)
+      return fail("allocate socket TLS session failed");
+    auto handshake = pump_handshake(*session);
+    if (handshake.is_err())
+      return fail(handshake.error());
+    return session.release();
   }
-  /// @endcond
 
   auto create_tls_server_context(const TlsConfig &config) -> Result<TlsContext>
   {
-    auto ctx = make_box<TlsContext_T>();
-    auto *impl = new TlsContextImpl();
-    ctx->impl = impl;
-
-    auto cfg_r = configure_tls_context(*impl, config, true);
-    if (cfg_r.is_err())
-    {
-      delete impl;
-      ctx->impl = nullptr;
-      return fail("{}", cfg_r.error());
-    }
-
-    return ctx;
+    crypto::TlsContextConfig crypto_config{
+        .role = crypto::TlsRole::server,
+        .peer_verification = config.verify_mode == ETlsVerifyMode::Required && !config.ca_file.empty()
+                                 ? crypto::TlsPeerVerification::certificate
+                                 : crypto::TlsPeerVerification::none,
+        .credentials =
+            {
+                .certificate_file = config.cert_file,
+                .private_key_file = config.key_file,
+                .trust_store_file = config.ca_file,
+            },
+        .profile = make_profile(),
+    };
+    auto result = crypto::create_tls_context(crypto_config);
+    if (result.is_err())
+      return fail(result.error());
+    auto impl =
+        std::unique_ptr<SocketTlsContext>(new (std::nothrow) SocketTlsContext{std::move(result.unwrap()), true, {}});
+    if (!impl)
+      return fail("allocate server TLS context failed");
+    auto context = make_box<TlsContext_T>();
+    context->impl = impl.release();
+    return context;
   }
 
   auto create_tls_client_context(const TlsConfig &config) -> Result<TlsContext>
   {
-    auto ctx = make_box<TlsContext_T>();
-    auto *impl = new TlsContextImpl();
-    ctx->impl = impl;
-
-    auto cfg_r = configure_tls_context(*impl, config, false);
-    if (cfg_r.is_err())
-    {
-      delete impl;
-      ctx->impl = nullptr;
-      return fail("{}", cfg_r.error());
-    }
-
-    return ctx;
+    crypto::TlsContextConfig crypto_config{
+        .role = crypto::TlsRole::client,
+        .peer_verification = config.verify_mode == ETlsVerifyMode::Required
+                                 ? crypto::TlsPeerVerification::certificate_and_identity
+                                 : crypto::TlsPeerVerification::none,
+        .credentials =
+            {
+                .certificate_file = config.cert_file,
+                .private_key_file = config.key_file,
+                .trust_store_file = config.ca_file,
+            },
+        .profile = make_profile(),
+    };
+    auto result = crypto::create_tls_context(crypto_config);
+    if (result.is_err())
+      return fail(result.error());
+    auto impl = std::unique_ptr<SocketTlsContext>(
+        new (std::nothrow) SocketTlsContext{std::move(result.unwrap()), false, config.expected_peer_name});
+    if (!impl)
+      return fail("allocate client TLS context failed");
+    auto context = make_box<TlsContext_T>();
+    context->impl = impl.release();
+    return context;
   }
 
   auto tls_client_connect(SocketClient &client, const String &address, u16 port, TlsContext &tls) -> Result<Connection>
   {
     if (__tls_context_is_server(tls))
       return fail("TLS context is configured for server use");
-
-    auto conn_r = socket_client_connect(client, address, port);
-    if (conn_r.is_err())
-      return fail("failed to connect: {}", conn_r.error());
-
-    auto conn = std::move(conn_r.unwrap());
-
-    auto session_r = __setup_tls_session(&conn->sock, tls, address.c_str());
-    if (session_r.is_err())
-      return fail("{}", session_r.error());
-
-    conn->tls = session_r.unwrap();
-    return conn;
+    auto connection_result = socket_client_connect(client, address, port);
+    if (connection_result.is_err())
+      return fail("failed to connect: {}", connection_result.error());
+    auto connection = std::move(connection_result.unwrap());
+    auto *context = static_cast<SocketTlsContext *>(__tls_context_impl(tls));
+    const String &peer_name = context->expected_peer_name.empty() ? address : context->expected_peer_name;
+    auto session_result = __setup_tls_session(&connection->sock, tls, peer_name);
+    if (session_result.is_err())
+      return fail(session_result.error());
+    connection->tls = session_result.unwrap();
+    return connection;
   }
 
   auto tls_server_accept(SocketServer &server, TlsContext &tls) -> Result<Connection>
   {
     if (!__tls_context_is_server(tls))
       return fail("TLS context is configured for client use");
-
-    auto conn_r = socket_server_accept(server);
-    if (conn_r.is_err())
-      return fail("failed to accept connection: {}", conn_r.error());
-
-    auto conn = std::move(conn_r.unwrap());
-
-    auto session_r = __setup_tls_session(&conn->sock, tls, nullptr);
-    if (session_r.is_err())
-      return fail("{}", session_r.error());
-
-    conn->tls = session_r.unwrap();
-    return conn;
+    auto connection_result = socket_server_accept(server);
+    if (connection_result.is_err())
+      return fail("failed to accept connection: {}", connection_result.error());
+    auto connection = std::move(connection_result.unwrap());
+    auto session_result = __setup_tls_session(&connection->sock, tls, String{});
+    if (session_result.is_err())
+      return fail(session_result.error());
+    connection->tls = session_result.unwrap();
+    return connection;
   }
 } // namespace ianet

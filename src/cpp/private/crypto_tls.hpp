@@ -23,6 +23,13 @@ namespace ianet::crypto::detail
     server,
   };
 
+  enum class PeerVerification
+  {
+    none,
+    certificate,
+    certificate_and_identity,
+  };
+
   enum class HandshakeState
   {
     needs_input,
@@ -67,6 +74,7 @@ namespace ianet::crypto::detail
   struct ContextConfig
   {
     Role role{};
+    PeerVerification peer_verification{PeerVerification::certificate_and_identity};
     Credentials credentials;
     Profile profile;
     std::vector<std::string> allowed_peer_names;
@@ -102,6 +110,7 @@ namespace ianet::crypto::detail
   {
     SslContextPtr native;
     Role role{};
+    PeerVerification peer_verification{PeerVerification::certificate_and_identity};
     Profile profile;
     std::vector<std::string> allowed_peer_names;
   };
@@ -112,6 +121,7 @@ namespace ianet::crypto::detail
     BIO *inbound{};
     BIO *outbound{};
     Role role{};
+    PeerVerification peer_verification{PeerVerification::certificate_and_identity};
     Profile profile;
     std::vector<std::string> expected_peer_names;
     bool authenticated{};

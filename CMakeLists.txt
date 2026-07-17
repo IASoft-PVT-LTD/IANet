@@ -37,5 +37,4 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sandbox")
     add_subdirectory(sandbox)
 endif()
 
-include(cmake/restore_toolchain.cmake)
 include(cmake/docs.cmake)

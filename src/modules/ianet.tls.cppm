@@ -13,7 +13,7 @@ module;
 
 /**
  * @file ianet.tls.cppm
- * @brief TLS support via MbedTLS.
+ * @brief Socket-oriented TLS support backed by the ianet.crypto provider.
  *
  * Provides server/client TLS contexts and connect/accept helpers that wrap
  * core @ref Connection handles with encrypted sessions.
@@ -38,9 +38,10 @@ export namespace ianet
   struct TlsConfig
   {
     ETlsVerifyMode verify_mode = ETlsVerifyMode::Required; ///< Client/server verification mode.
-    String cert_file;  ///< Path to PEM certificate (required for servers).
-    String key_file;   ///< Path to PEM private key (required for servers).
-    String ca_file;    ///< Path to PEM CA bundle (required for client verification).
+    String cert_file;          ///< Path to PEM certificate (required for servers).
+    String key_file;           ///< Path to PEM private key (required for servers).
+    String ca_file;            ///< Path to PEM CA bundle (required for client verification).
+    String expected_peer_name; ///< Client-side DNS/IP identity; defaults to the connection address.
   };
 
   /// @cond INTERNAL
@@ -50,6 +51,7 @@ export namespace ianet
 
     ~TlsContext_T();
   };
+
   /// @endcond
 
   /** @brief Opaque TLS context (server or client configuration). */
@@ -70,7 +72,7 @@ export namespace ianet
   /**
    * @brief Connects to a remote host and performs the TLS handshake.
    * @param client   TCP client from @ref create_socket_client.
-   * @param address  IPv4 address (also used as SNI hostname).
+   * @param address  IPv4 address; also the peer identity unless overridden in @ref TlsConfig.
    * @param port     Remote port.
    * @param tls      Client TLS context from @ref create_tls_client_context.
    */
@@ -90,6 +92,7 @@ namespace ianet
   using namespace au;
   auto __tls_context_impl(TlsContext &tls) -> void *;
   auto __tls_context_is_server(TlsContext &tls) -> bool;
-  auto __setup_tls_session(NativeSocket *sock, TlsContext &tls, const char *hostname) -> Result<void *>;
+  auto __setup_tls_session(NativeSocket *sock, TlsContext &tls, const String &peer_name) -> Result<void *>;
 } // namespace ianet
+
 /// @endcond

@@ -29,6 +29,20 @@ namespace ianet::crypto
       return role == TlsRole::client ? detail::Role::client : detail::Role::server;
     }
 
+    auto to_detail_verification(TlsPeerVerification verification) -> detail::PeerVerification
+    {
+      switch (verification)
+      {
+      case TlsPeerVerification::none:
+        return detail::PeerVerification::none;
+      case TlsPeerVerification::certificate:
+        return detail::PeerVerification::certificate;
+      case TlsPeerVerification::certificate_and_identity:
+        return detail::PeerVerification::certificate_and_identity;
+      }
+      return detail::PeerVerification::certificate_and_identity;
+    }
+
     auto context_impl(TlsContext &context) -> detail::Context *
     {
       return context ? static_cast<detail::Context *>(context->impl) : nullptr;
@@ -91,6 +105,7 @@ namespace ianet::crypto
   {
     detail::ContextConfig internal{
         .role = to_detail_role(config.role),
+        .peer_verification = to_detail_verification(config.peer_verification),
         .credentials =
             {
                 .certificate_file = to_std_string(config.credentials.certificate_file),
@@ -162,7 +177,8 @@ namespace ianet::crypto
         .protocol_version = String(SSL_get_version(impl->native.get())),
         .key_exchange_group = String(group),
         .cipher_suite = String(SSL_CIPHER_get_name(cipher)),
-        .peer_verified = SSL_get_verify_result(impl->native.get()) == X509_V_OK,
+        .peer_verified = impl->peer_verification != detail::PeerVerification::none &&
+                         SSL_get_verify_result(impl->native.get()) == X509_V_OK,
         .session_reused = SSL_session_reused(impl->native.get()) != 0,
         .early_data_accepted = SSL_early_data_accepted(impl->native.get()) != 0,
     };
