@@ -69,6 +69,17 @@ namespace ianet::crypto::detail
       }
       return std::unexpected(std::string("authenticated peer certificate does not match an allowed identity"));
     }
+
+    auto emit_pending_key_update_response(Session &session) -> Result<void>
+    {
+      if (SSL_get_key_update_type(session.native.get()) == SSL_KEY_UPDATE_NONE)
+        return {};
+      if (SSL_write(session.native.get(), nullptr, 0) != 0)
+        return std::unexpected(format_error("emit TLS 1.3 key-update response"));
+      if (SSL_get_key_update_type(session.native.get()) != SSL_KEY_UPDATE_NONE)
+        return std::unexpected(std::string("TLS provider did not emit the key-update response"));
+      return {};
+    }
   } // namespace
 
   auto create_session(Context &context, std::string_view expected_peer_name) -> Result<Session>
@@ -228,9 +239,12 @@ namespace ianet::crypto::detail
     const std::size_t size = std::min(plaintext.size(), static_cast<std::size_t>(std::numeric_limits<int>::max()));
     clear_errors();
     const int result = SSL_read(session.native.get(), plaintext.data(), static_cast<int>(size));
+    const int error = result > 0 ? SSL_ERROR_NONE : SSL_get_error(session.native.get(), result);
+    auto key_update_result = emit_pending_key_update_response(session);
+    if (!key_update_result)
+      return std::unexpected(std::move(key_update_result.error()));
     if (result > 0)
       return IoResult{IoState::complete, static_cast<std::size_t>(result)};
-    const int error = SSL_get_error(session.native.get(), result);
     if (error == SSL_ERROR_WANT_READ)
       return IoResult{IoState::needs_input, 0U};
     if (error == SSL_ERROR_WANT_WRITE)
@@ -256,6 +270,25 @@ namespace ianet::crypto::detail
     if (error == SSL_ERROR_WANT_WRITE)
       return ShutdownState::needs_output;
     return std::unexpected(format_error("TLS shutdown failed"));
+  }
+
+  auto key_update_step(Session &session, bool request_peer) -> Result<void>
+  {
+    if (!session.native || !session.authenticated)
+      return std::unexpected(std::string("cannot update TLS keys before authentication completes"));
+    if (SSL_version(session.native.get()) != TLS1_3_VERSION)
+      return std::unexpected(std::string("TLS key updates require TLS 1.3"));
+
+    clear_errors();
+    const int request = request_peer ? SSL_KEY_UPDATE_REQUESTED : SSL_KEY_UPDATE_NOT_REQUESTED;
+    if (SSL_key_update(session.native.get(), request) != 1)
+      return std::unexpected(format_error("schedule TLS 1.3 key update"));
+    if (SSL_write(session.native.get(), nullptr, 0) != 0)
+      return std::unexpected(format_error("emit TLS 1.3 key update"));
+    if (SSL_get_key_update_type(session.native.get()) != SSL_KEY_UPDATE_NONE)
+      return std::unexpected(std::string("TLS provider did not emit the queued key update"));
+    clear_errors();
+    return {};
   }
 
   auto pending_ciphertext(const Session &session) noexcept -> std::size_t

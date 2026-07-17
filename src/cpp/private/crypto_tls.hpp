@@ -136,6 +136,7 @@ namespace ianet::crypto::detail
   [[nodiscard]] auto write_step(Session &session, std::span<const std::uint8_t> plaintext) -> Result<IoResult>;
   [[nodiscard]] auto read_step(Session &session, std::span<std::uint8_t> plaintext) -> Result<IoResult>;
   [[nodiscard]] auto shutdown_step(Session &session) -> Result<ShutdownState>;
+  [[nodiscard]] auto key_update_step(Session &session, bool request_peer) -> Result<void>;
   [[nodiscard]] auto pending_ciphertext(const Session &session) noexcept -> std::size_t;
   [[nodiscard]] auto take_ciphertext(Session &session) -> Result<std::vector<std::uint8_t>>;
   [[nodiscard]] auto provide_ciphertext(Session &session, std::span<const std::uint8_t> ciphertext) -> Result<void>;

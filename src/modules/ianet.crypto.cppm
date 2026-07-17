@@ -57,6 +57,13 @@ export namespace ianet::crypto
     needs_output,
   };
 
+  /** @brief Whether a local TLS 1.3 key update also asks the peer to update. */
+  enum class TlsKeyUpdateRequest
+  {
+    local_only,
+    request_peer,
+  };
+
   struct TlsIoResult
   {
     TlsIoState state{};
@@ -123,6 +130,7 @@ export namespace ianet::crypto
   [[nodiscard]] auto tls_write_step(TlsSession &session, Span<const u8> plaintext) -> Result<TlsIoResult>;
   [[nodiscard]] auto tls_read_step(TlsSession &session, Span<u8> plaintext) -> Result<TlsIoResult>;
   [[nodiscard]] auto tls_shutdown_step(TlsSession &session) -> Result<TlsShutdownState>;
+  [[nodiscard]] auto tls_key_update_step(TlsSession &session, TlsKeyUpdateRequest request) -> Result<void>;
 
   [[nodiscard]] auto pending_tls_ciphertext(const TlsSession &session) -> usize;
   [[nodiscard]] auto take_tls_ciphertext(TlsSession &session) -> Result<Vec<u8>>;

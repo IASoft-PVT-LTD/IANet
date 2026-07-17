@@ -229,6 +229,17 @@ namespace ianet::crypto
     return fail("crypto TLS returned an invalid shutdown state");
   }
 
+  auto tls_key_update_step(TlsSession &session, TlsKeyUpdateRequest request) -> Result<void>
+  {
+    auto *impl = session_impl(session);
+    if (impl == nullptr)
+      return fail("crypto TLS session is not initialized");
+    auto result = detail::key_update_step(*impl, request == TlsKeyUpdateRequest::request_peer);
+    if (!result)
+      return fail("TLS key update failed: {}", result.error());
+    return Result<void>();
+  }
+
   auto pending_tls_ciphertext(const TlsSession &session) -> usize
   {
     const auto *impl = session_impl(session);
