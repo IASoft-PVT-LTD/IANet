@@ -9,7 +9,9 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: docker
+    container:
+      image: ubuntu:24.04
     permissions:
       contents: read
     strategy:
@@ -34,31 +36,6 @@ jobs:
           sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
           clang --version
           clang++ --version
-
-      - name: Configure
-        run: cmake --preset ${{ matrix.target }}
-
-      - name: Build
-        run: cmake --build --preset ${{ matrix.target }} --config Release
-
-      - name: Test
-        run: ctest --preset ${{ matrix.target }} --output-on-failure
-
-  build-windows:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [ianet-x64-windows-msvc]
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
         run: cmake --preset ${{ matrix.target }}
