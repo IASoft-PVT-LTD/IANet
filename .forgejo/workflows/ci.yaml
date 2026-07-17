@@ -11,7 +11,7 @@ jobs:
   build-linux:
     runs-on: docker
     container:
-      image: ubuntu:24.04
+      image: catthehacker/ubuntu:runner-24.04
     permissions:
       contents: read
     strategy:
