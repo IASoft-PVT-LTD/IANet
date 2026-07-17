@@ -1,5 +1,11 @@
 # IANet
 
+IANet exposes its socket APIs through `import ianet`, its existing
+socket-attached TLS API through `import ianet.tls`, and an additive
+provider-neutral memory-BIO crypto API through `import ianet.crypto`.
+`ianet.crypto` is backed by AWS-LC but exports only opaque handles, Auxid
+containers, state enums, and `Result<T>` diagnostics.
+
 Cross-platform C++23 networking library for Windows and Linux. IANet provides
 socket clients and servers, HTTP/1.x, TLS (via MbedTLS), and HTTPS helpers on
 top of the [Auxid](https://github.com/IASoft-PVT-LTD/libauxid) platform library.
@@ -11,12 +17,14 @@ top of the [Auxid](https://github.com/IASoft-PVT-LTD/libauxid) platform library.
 | Core | `import ianet;` | Sockets, connections, re-exports `auxid` |
 | HTTP | `import ianet.http;` | HTTP/1.x client and server |
 | TLS | `import ianet.tls;` | TLS contexts and encrypted connections |
+| Crypto | `import ianet.crypto;` | Provider-neutral memory-BIO TLS primitives |
 | HTTPS | `import ianet.https;` | Convenience HTTPS server/client helpers |
 
 ```
 ianet
  ├── ianet.http ──► ianet.https
- └── ianet.tls  ──► ianet.https
+ ├── ianet.tls  ──► ianet.https
+ └── ianet.crypto
 ```
 
 The core `ianet` module **re-exports Auxid** (`export import auxid`). Use Auxid

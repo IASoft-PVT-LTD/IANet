@@ -23,6 +23,9 @@
 - **Simple API:** Easy-to-use functions for managing contexts, clients, servers, and connections.
 - **Robust Error Handling:** Utilizes `Result<T>` for safe, exception-free error management.
 - **Modern C++:** Built with modern C++ practices, custom allocators, and smart pointers.
+- **Crypto Abstraction:** Additive `ianet.crypto` memory-BIO TLS contexts and
+  sessions backed by AWS-LC without exposing provider-native types. The
+  existing `ianet.tls` and HTTPS interfaces remain available.
 
 ## Quick start (CMake)
 
