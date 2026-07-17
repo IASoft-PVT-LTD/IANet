@@ -13,6 +13,8 @@ namespace ianet::crypto::detail
 {
   namespace
   {
+    constexpr unsigned int STRICT_IDENTITY_FLAGS = X509_CHECK_FLAG_NEVER_CHECK_SUBJECT | X509_CHECK_FLAG_NO_WILDCARDS;
+
     auto contains_nul(std::string_view value) -> bool
     {
       return value.find('\0') != std::string_view::npos;
@@ -20,7 +22,7 @@ namespace ianet::crypto::detail
 
     auto valid_peer_name(std::string_view name) -> bool
     {
-      return !name.empty() && name.size() <= 253U && !contains_nul(name);
+      return !name.empty() && name.size() <= 253U && !contains_nul(name) && name.find('*') == std::string_view::npos;
     }
 
     auto is_ip_address(const char *name) -> bool
@@ -33,7 +35,7 @@ namespace ianet::crypto::detail
     {
       if (is_ip_address(name.c_str()))
         return X509_check_ip_asc(certificate, name.c_str(), 0U) == 1;
-      return X509_check_host(certificate, name.c_str(), name.size(), X509_CHECK_FLAG_NEVER_CHECK_SUBJECT, nullptr) == 1;
+      return X509_check_host(certificate, name.c_str(), name.size(), STRICT_IDENTITY_FLAGS, nullptr) == 1;
     }
 
     auto configure_client_identity(SSL *ssl, const std::string &expected_name) -> Result<void>
@@ -45,7 +47,7 @@ namespace ianet::crypto::detail
         return {};
       }
 
-      SSL_set_hostflags(ssl, X509_CHECK_FLAG_NEVER_CHECK_SUBJECT);
+      SSL_set_hostflags(ssl, STRICT_IDENTITY_FLAGS);
       if (SSL_set1_host(ssl, expected_name.c_str()) != 1)
         return std::unexpected(format_error("configure expected server DNS identity"));
       if (SSL_set_tlsext_host_name(ssl, expected_name.c_str()) != 1)

@@ -24,7 +24,7 @@ namespace ianet::crypto::detail
 
     auto valid_peer_name(std::string_view name) -> bool
     {
-      return valid_text(name) && name.size() <= 253U;
+      return valid_text(name) && name.size() <= 253U && name.find('*') == std::string_view::npos;
     }
 
     auto failure(std::string_view operation) -> std::unexpected<std::string>
