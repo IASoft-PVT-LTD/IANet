@@ -8,6 +8,7 @@ add_library(IANET STATIC
     cpp/crypto.cpp
     cpp/crypto_tls_profile.cpp
     cpp/crypto_tls_session.cpp
+    cpp/crypto_inner_sealer.cpp
     cpp/vendor/picohttpparser/picohttpparser.c
 )
 
