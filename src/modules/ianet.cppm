@@ -181,6 +181,22 @@ export namespace ianet
   auto socket_client_connect(SocketClient &client, const String &address, u16 port) -> Result<Connection>;
 
   /**
+   * @brief Connects a client to a remote IPv4 host, failing if the TCP
+   *        connection is not established within the timeout.
+   *
+   * Uses a non-blocking connect internally; the returned connection is in
+   * ordinary blocking mode.
+   *
+   * @param client     Client created with @ref create_socket_client.
+   * @param address    IPv4 address string (e.g. `"127.0.0.1"`).
+   * @param port       Remote port.
+   * @param timeout_ms Maximum time to wait for connection establishment.
+   * @return A connected @ref Connection on success.
+   */
+  auto socket_client_connect(SocketClient &client, const String &address, u16 port, u32 timeout_ms)
+      -> Result<Connection>;
+
+  /**
    * @brief Accepts an incoming connection on a TCP server.
    * @param server  TCP server created with @ref create_socket_server.
    * @return A new @ref Connection for the accepted peer.
@@ -201,6 +217,35 @@ export namespace ianet
    * @return Received bytes (may be fewer than @p size).
    */
   auto connection_receive(Connection &connection, usize size) -> Result<Vec<u8>>;
+
+  /**
+   * @brief Waits until the connection's socket is readable or the timeout
+   *        elapses.
+   *
+   * Readability includes EOF and socket errors so a following receive can
+   * surface the exact condition. This waits on the raw socket only; it does
+   * not observe data buffered inside an attached TLS session, so callers
+   * that bridge TLS through memory BIOs must drain session-buffered data
+   * before waiting.
+   *
+   * @param connection  Active connection.
+   * @param timeout_ms  Maximum time to wait, in milliseconds.
+   * @return `true` when the socket is readable, `false` on timeout.
+   */
+  auto connection_wait_readable(Connection &connection, u32 timeout_ms) -> Result<bool>;
+
+  /**
+   * @brief Waits until the connection's socket is writable or the timeout
+   *        elapses.
+   *
+   * Writability includes socket errors so a following send can surface the
+   * exact condition.
+   *
+   * @param connection  Active connection.
+   * @param timeout_ms  Maximum time to wait, in milliseconds.
+   * @return `true` when the socket is writable, `false` on timeout.
+   */
+  auto connection_wait_writable(Connection &connection, u32 timeout_ms) -> Result<bool>;
 } // namespace ianet
 
 /// @cond INTERNAL

@@ -27,10 +27,13 @@ module;
 #  include <arpa/inet.h>
 #  include <cerrno>
 #  include <netinet/in.h>
+#  include <poll.h>
 #  include <sys/socket.h>
 #  include <unistd.h>
 #endif
 
+#include <chrono>
+#include <climits>
 #include <cstddef>
 
 /// @cond INTERNAL
@@ -72,6 +75,42 @@ namespace ianet
         off += static_cast<usize>(r);
       }
       return Result<void>();
+    }
+
+    auto wait_for_socket_event(NativeSocket s, short events, u32 timeout_ms) -> Result<bool>
+    {
+      using Clock = std::chrono::steady_clock;
+      const Clock::time_point deadline = Clock::now() + std::chrono::milliseconds(timeout_ms);
+      for (;;)
+      {
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();
+        const int wait_ms = remaining <= 0 ? 0 : (remaining > INT_MAX ? INT_MAX : static_cast<int>(remaining));
+#if AU_PLATFORM_WINDOWS
+        WSAPOLLFD descriptor{};
+        descriptor.fd = s;
+        descriptor.events = events;
+        const int r = WSAPoll(&descriptor, 1U, wait_ms);
+        if (r == SOCKET_ERROR)
+          return fail("poll failed: {}", WSAGetLastError());
+#else
+        pollfd descriptor{};
+        descriptor.fd = s;
+        descriptor.events = events;
+        const int r = ::poll(&descriptor, 1U, wait_ms);
+        if (r < 0)
+        {
+          if (errno == EINTR)
+            continue;
+          return fail("poll failed: {}", errno);
+        }
+#endif
+        // Error/hangup conditions count as ready so the following socket
+        // operation reports the precise failure.
+        if (r > 0)
+          return true;
+        if (Clock::now() >= deadline)
+          return false;
+      }
     }
   } // namespace
 
@@ -165,5 +204,15 @@ namespace ianet
 
     buf.resize(static_cast<usize>(n));
     return buf;
+  }
+
+  auto connection_wait_readable(Connection &connection, u32 timeout_ms) -> Result<bool>
+  {
+    return wait_for_socket_event(connection->sock, POLLIN, timeout_ms);
+  }
+
+  auto connection_wait_writable(Connection &connection, u32 timeout_ms) -> Result<bool>
+  {
+    return wait_for_socket_event(connection->sock, POLLOUT, timeout_ms);
   }
 } // namespace ianet
