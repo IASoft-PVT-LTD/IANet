@@ -192,7 +192,7 @@ namespace ianet::crypto
     {
       // No plaintext is released on authentication failure; wipe the scratch
       // buffer regardless and return the fixed, cause-agnostic error.
-      OPENSSL_cleanse(plaintext.data(), plaintext.size());
+      secure_erase(Span<u8>(plaintext.data(), plaintext.size()));
       return fail("{}", INNER_AUTH_ERROR);
     }
     plaintext.resize(plaintext_len);
