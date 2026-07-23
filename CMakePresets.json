@@ -6,8 +6,8 @@
   },
   "configurePresets": [
     {
-      "name": "ianet-x64-linux",
-      "displayName": "ianet Linux x64 (Clang)",
+      "name": "IANet-x64-linux",
+      "displayName": "IANet Linux x64 (Clang)",
       "inherits": "x64-linux",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -15,8 +15,8 @@
       }
     },
     {
-      "name": "ianet-arm64-linux",
-      "displayName": "ianet Linux ARM64 (Clang Cross)",
+      "name": "IANet-arm64-linux",
+      "displayName": "IANet Linux ARM64 (Clang Cross)",
       "inherits": "arm64-linux",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -24,8 +24,107 @@
       }
     },
     {
-      "name": "ianet-x64-windows-msvc",
-      "displayName": "ianet Windows x64 (Ninja MSVC)",
+      "name": "IANet-x64-linux-shared",
+      "displayName": "IANet Linux x64 (Clang, Shared lib)",
+      "inherits": "x64-linux-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-linux-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-linux-shared",
+      "displayName": "IANet Linux ARM64 (Clang Cross, Shared lib)",
+      "inherits": "arm64-linux-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-linux-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-linux-native",
+      "displayName": "IANet Linux ARM64 native (Clang)",
+      "inherits": "arm64-linux-native",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-linux-native-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-linux-native-shared",
+      "displayName": "IANet Linux ARM64 native (Clang, Shared lib)",
+      "inherits": "arm64-linux-native-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-linux-native-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-linux-gcc",
+      "displayName": "IANet Linux x64 (GCC 15.2)",
+      "inherits": "x64-linux-gcc",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-linux-gcc.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-linux-gcc",
+      "displayName": "IANet Linux ARM64 (GCC 15.2 Cross)",
+      "inherits": "arm64-linux-gcc",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-linux-gcc.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-darwin",
+      "displayName": "IANet macOS ARM64 (LLVM Clang)",
+      "inherits": "arm64-darwin",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-darwin-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-darwin-shared",
+      "displayName": "IANet macOS ARM64 (LLVM Clang, Shared lib)",
+      "inherits": "arm64-darwin-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-darwin-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-darwin",
+      "displayName": "IANet macOS Intel (LLVM Clang)",
+      "inherits": "x64-darwin",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-darwin-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-darwin-shared",
+      "displayName": "IANet macOS Intel (LLVM Clang, Shared lib)",
+      "inherits": "x64-darwin-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-darwin-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-mingw-gcc",
+      "displayName": "IANet Windows x64 (MinGW GCC 15.2)",
+      "inherits": "x64-windows-mingw-gcc",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-mingw-gcc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-msvc",
+      "displayName": "IANet Windows x64 (Ninja MSVC)",
       "inherits": "x64-windows-msvc",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -33,8 +132,17 @@
       }
     },
     {
-      "name": "ianet-x64-windows-clang",
-      "displayName": "ianet Windows x64 (Ninja Clang)",
+      "name": "IANet-x64-windows-msvc-shared",
+      "displayName": "IANet Windows x64 (MSVC, Shared lib)",
+      "inherits": "x64-windows-msvc-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-msvc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-clang",
+      "displayName": "IANet Windows x64 (Ninja Clang)",
       "inherits": "x64-windows-clang",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -42,8 +150,17 @@
       }
     },
     {
-      "name": "ianet-arm64-windows-clang",
-      "displayName": "ianet Windows ARM64 (Ninja Clang Cross)",
+      "name": "IANet-x64-windows-clang-shared",
+      "displayName": "IANet Windows x64 (Clang, Shared lib)",
+      "inherits": "x64-windows-clang-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-windows-clang",
+      "displayName": "IANet Windows ARM64 (Ninja Clang Cross)",
       "inherits": "arm64-windows-clang",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -51,8 +168,17 @@
       }
     },
     {
-      "name": "ianet-arm64-windows-msvc",
-      "displayName": "ianet Windows ARM64 (Ninja MSVC)",
+      "name": "IANet-arm64-windows-clang-shared",
+      "displayName": "IANet Windows ARM64 (Clang Cross, Shared lib)",
+      "inherits": "arm64-windows-clang-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-windows-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-arm64-windows-msvc",
+      "displayName": "IANet Windows ARM64 (Ninja MSVC)",
       "inherits": "arm64-windows-msvc",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -60,8 +186,17 @@
       }
     },
     {
-      "name": "ianet-x64-windows",
-      "displayName": "ianet Windows x64 (Visual Studio 2026)",
+      "name": "IANet-arm64-windows-msvc-shared",
+      "displayName": "IANet Windows ARM64 (MSVC, Shared lib)",
+      "inherits": "arm64-windows-msvc-shared",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/arm64-windows-msvc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows",
+      "displayName": "IANet Windows x64 (Visual Studio 2026)",
       "inherits": "x64-windows",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -69,8 +204,8 @@
       }
     },
     {
-      "name": "ianet-arm64-windows",
-      "displayName": "ianet Windows ARM64 (Visual Studio 2026)",
+      "name": "IANet-arm64-windows",
+      "displayName": "IANet Windows ARM64 (Visual Studio 2026)",
       "inherits": "arm64-windows",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
@@ -78,82 +213,341 @@
       }
     },
     {
-      "name": "ianet-wasm32-emscripten",
-      "displayName": "ianet WebAssembly (Clang)",
+      "name": "IANet-wasm32-emscripten",
+      "displayName": "IANet WebAssembly (Clang)",
       "inherits": "wasm32-emscripten",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/wasm32-emscripten-clang.cmake"
       }
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench",
+      "displayName": "IANet Windows x64 (MSVC, Benchmarks)",
+      "inherits": "x64-windows-msvc-bench",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-msvc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench-pgo-gen",
+      "displayName": "IANet Windows x64 (MSVC, Benchmarks, PGO instrument)",
+      "inherits": "x64-windows-msvc-bench-pgo-gen",
+      "binaryDir": "${sourceDir}/out/build/IANet-x64-windows-msvc-bench-pgo",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-msvc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench-pgo",
+      "displayName": "IANet Windows x64 (MSVC, Benchmarks, PGO optimized)",
+      "inherits": "x64-windows-msvc-bench-pgo",
+      "binaryDir": "${sourceDir}/out/build/IANet-x64-windows-msvc-bench-pgo",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-msvc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-clang-bench",
+      "displayName": "IANet Windows x64 (Clang, Benchmarks)",
+      "inherits": "x64-windows-clang-bench",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-windows-mingw-gcc-bench",
+      "displayName": "IANet Windows x64 (MinGW GCC, Benchmarks)",
+      "inherits": "x64-windows-mingw-gcc-bench",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-windows-mingw-gcc.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-linux-asan",
+      "displayName": "IANet Linux x64 (Clang, AddressSanitizer)",
+      "inherits": "x64-linux-asan",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-linux-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-linux-ubsan",
+      "displayName": "IANet Linux x64 (Clang, UBSan)",
+      "inherits": "x64-linux-ubsan",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-linux-clang.cmake"
+      }
+    },
+    {
+      "name": "IANet-x64-linux-tsan",
+      "displayName": "IANet Linux x64 (Clang, ThreadSanitizer)",
+      "inherits": "x64-linux-tsan",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/libauxid/cmake/toolchains/x64-linux-clang.cmake"
+      }
     }
   ],
   "buildPresets": [
     {
-      "name": "ianet-x64-linux",
-      "configurePreset": "ianet-x64-linux"
+      "name": "IANet-x64-linux",
+      "configurePreset": "IANet-x64-linux"
     },
     {
-      "name": "ianet-arm64-linux",
-      "configurePreset": "ianet-arm64-linux"
+      "name": "IANet-arm64-linux",
+      "configurePreset": "IANet-arm64-linux"
     },
     {
-      "name": "ianet-x64-windows-msvc",
-      "configurePreset": "ianet-x64-windows-msvc"
+      "name": "IANet-x64-linux-shared",
+      "configurePreset": "IANet-x64-linux-shared"
     },
     {
-      "name": "ianet-x64-windows-clang",
-      "configurePreset": "ianet-x64-windows-clang"
+      "name": "IANet-arm64-linux-shared",
+      "configurePreset": "IANet-arm64-linux-shared"
     },
     {
-      "name": "ianet-arm64-windows-clang",
-      "configurePreset": "ianet-arm64-windows-clang"
+      "name": "IANet-arm64-linux-native",
+      "configurePreset": "IANet-arm64-linux-native"
     },
     {
-      "name": "ianet-arm64-windows-msvc",
-      "configurePreset": "ianet-arm64-windows-msvc"
+      "name": "IANet-arm64-linux-native-shared",
+      "configurePreset": "IANet-arm64-linux-native-shared"
     },
     {
-      "name": "ianet-x64-windows",
-      "configurePreset": "ianet-x64-windows"
+      "name": "IANet-x64-linux-gcc",
+      "configurePreset": "IANet-x64-linux-gcc"
     },
     {
-      "name": "ianet-arm64-windows",
-      "configurePreset": "ianet-arm64-windows"
+      "name": "IANet-arm64-linux-gcc",
+      "configurePreset": "IANet-arm64-linux-gcc"
     },
     {
-      "name": "ianet-wasm32-emscripten",
-      "configurePreset": "ianet-wasm32-emscripten"
+      "name": "IANet-arm64-darwin",
+      "configurePreset": "IANet-arm64-darwin"
+    },
+    {
+      "name": "IANet-arm64-darwin-shared",
+      "configurePreset": "IANet-arm64-darwin-shared"
+    },
+    {
+      "name": "IANet-x64-darwin",
+      "configurePreset": "IANet-x64-darwin"
+    },
+    {
+      "name": "IANet-x64-darwin-shared",
+      "configurePreset": "IANet-x64-darwin-shared"
+    },
+    {
+      "name": "IANet-x64-windows-mingw-gcc",
+      "configurePreset": "IANet-x64-windows-mingw-gcc"
+    },
+    {
+      "name": "IANet-x64-windows-msvc",
+      "configurePreset": "IANet-x64-windows-msvc"
+    },
+    {
+      "name": "IANet-x64-windows-msvc-shared",
+      "configurePreset": "IANet-x64-windows-msvc-shared"
+    },
+    {
+      "name": "IANet-x64-windows-clang",
+      "configurePreset": "IANet-x64-windows-clang"
+    },
+    {
+      "name": "IANet-x64-windows-clang-shared",
+      "configurePreset": "IANet-x64-windows-clang-shared"
+    },
+    {
+      "name": "IANet-arm64-windows-clang",
+      "configurePreset": "IANet-arm64-windows-clang"
+    },
+    {
+      "name": "IANet-arm64-windows-clang-shared",
+      "configurePreset": "IANet-arm64-windows-clang-shared"
+    },
+    {
+      "name": "IANet-arm64-windows-msvc",
+      "configurePreset": "IANet-arm64-windows-msvc"
+    },
+    {
+      "name": "IANet-arm64-windows-msvc-shared",
+      "configurePreset": "IANet-arm64-windows-msvc-shared"
+    },
+    {
+      "name": "IANet-x64-windows",
+      "configurePreset": "IANet-x64-windows"
+    },
+    {
+      "name": "IANet-arm64-windows",
+      "configurePreset": "IANet-arm64-windows"
+    },
+    {
+      "name": "IANet-wasm32-emscripten",
+      "configurePreset": "IANet-wasm32-emscripten"
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench",
+      "configurePreset": "IANet-x64-windows-msvc-bench",
+      "configuration": "Release",
+      "targets": [
+        "AuxidBench"
+      ]
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench-pgo-gen",
+      "configurePreset": "IANet-x64-windows-msvc-bench-pgo-gen",
+      "configuration": "Release",
+      "targets": [
+        "AuxidBench"
+      ]
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench-pgo-train",
+      "configurePreset": "IANet-x64-windows-msvc-bench-pgo-gen",
+      "configuration": "Release",
+      "targets": [
+        "auxid_bench_pgo_train"
+      ]
+    },
+    {
+      "name": "IANet-x64-windows-msvc-bench-pgo",
+      "configurePreset": "IANet-x64-windows-msvc-bench-pgo",
+      "configuration": "Release",
+      "targets": [
+        "AuxidBench"
+      ]
+    },
+    {
+      "name": "IANet-x64-windows-clang-bench",
+      "configurePreset": "IANet-x64-windows-clang-bench",
+      "configuration": "Release",
+      "targets": [
+        "AuxidBench"
+      ]
+    },
+    {
+      "name": "IANet-x64-windows-mingw-gcc-bench",
+      "configurePreset": "IANet-x64-windows-mingw-gcc-bench",
+      "configuration": "Release",
+      "targets": [
+        "AuxidBench"
+      ]
+    },
+    {
+      "name": "IANet-x64-linux-asan",
+      "configurePreset": "IANet-x64-linux-asan",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "IANet-x64-linux-ubsan",
+      "configurePreset": "IANet-x64-linux-ubsan",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "IANet-x64-linux-tsan",
+      "configurePreset": "IANet-x64-linux-tsan",
+      "configuration": "RelWithDebInfo"
     }
   ],
   "testPresets": [
     {
-      "name": "ianet-x64-linux",
-      "configurePreset": "ianet-x64-linux",
+      "name": "IANet-x64-linux",
+      "configurePreset": "IANet-x64-linux",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "ianet-x64-windows",
-      "configurePreset": "ianet-x64-windows",
+      "name": "IANet-x64-linux-gcc",
+      "configurePreset": "IANet-x64-linux-gcc",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "ianet-x64-windows-clang",
-      "configurePreset": "ianet-x64-windows-clang",
+      "name": "IANet-arm64-darwin",
+      "configurePreset": "IANet-arm64-darwin",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "ianet-x64-windows-msvc",
-      "configurePreset": "ianet-x64-windows-msvc",
+      "name": "IANet-x64-windows-mingw-gcc",
+      "configurePreset": "IANet-x64-windows-mingw-gcc",
       "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-windows",
+      "configurePreset": "IANet-x64-windows",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-windows-msvc",
+      "configurePreset": "IANet-x64-windows-msvc",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-windows-clang",
+      "configurePreset": "IANet-x64-windows-clang",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-windows-clang-shared",
+      "configurePreset": "IANet-x64-windows-clang-shared",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-wasm32-emscripten",
+      "configurePreset": "IANet-wasm32-emscripten",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-linux-asan",
+      "configurePreset": "IANet-x64-linux-asan",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-linux-ubsan",
+      "configurePreset": "IANet-x64-linux-ubsan",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "IANet-x64-linux-tsan",
+      "configurePreset": "IANet-x64-linux-tsan",
+      "configuration": "RelWithDebInfo",
       "output": {
         "outputOnFailure": true
       }
