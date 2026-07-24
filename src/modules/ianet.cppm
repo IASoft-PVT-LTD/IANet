@@ -26,6 +26,7 @@ module;
 #  include <unistd.h>
 #endif
 
+#include <atomic>
 #include <cstddef>
 
 /// @cond INTERNAL
@@ -58,9 +59,11 @@ export namespace ianet
 #if AU_PLATFORM_WINDOWS
   /** @brief Platform-native socket handle (`SOCKET` on Windows). */
   using NativeSocket = SOCKET;
+  inline constexpr NativeSocket INVALID_NATIVE_SOCKET = INVALID_SOCKET;
 #else
   /** @brief Platform-native socket handle (file descriptor on Linux). */
   using NativeSocket = int;
+  inline constexpr NativeSocket INVALID_NATIVE_SOCKET = -1;
 #endif
 
   /**
@@ -116,13 +119,13 @@ export namespace ianet
 
   struct SocketServer_T
   {
-    NativeSocket sock{};
+    std::atomic<NativeSocket> sock{INVALID_NATIVE_SOCKET};
     EProtocolType protocol{};
     u16 port{};
 
     ~SocketServer_T()
     {
-      native_socket_close(sock);
+      native_socket_close(sock.exchange(INVALID_NATIVE_SOCKET));
     }
   };
 
@@ -202,6 +205,9 @@ export namespace ianet
    * @return A new @ref Connection for the accepted peer.
    */
   auto socket_server_accept(SocketServer &server) -> Result<Connection>;
+
+  /** @brief Closes a listening server and unblocks a pending accept. */
+  auto socket_server_close(SocketServer &server) -> Result<void>;
 
   /**
    * @brief Sends bytes on a connection (plain socket or TLS session).

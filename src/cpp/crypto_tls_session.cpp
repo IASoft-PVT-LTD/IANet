@@ -62,12 +62,15 @@ namespace ianet::crypto::detail
       return {};
     }
 
-    auto verify_peer_identity(const Session &session, const X509 *certificate) -> Result<void>
+    auto verify_peer_identity(Session &session, const X509 *certificate) -> Result<void>
     {
       for (const std::string &name : session.expected_peer_names)
       {
         if (certificate_matches_name(certificate, name))
+        {
+          session.authenticated_peer_identity = name;
           return {};
+        }
       }
       return std::unexpected(std::string("authenticated peer certificate does not match an allowed identity"));
     }
@@ -141,6 +144,7 @@ namespace ianet::crypto::detail
                     context.peer_verification,
                     context.profile,
                     std::move(expected_names),
+                    std::string{},
                     false};
     session.inbound = SSL_get_rbio(session.native.get());
     session.outbound = SSL_get_wbio(session.native.get());
@@ -148,7 +152,7 @@ namespace ianet::crypto::detail
     return session;
   }
 
-  auto validate_profile(const Session &session) -> Result<void>
+  auto validate_profile(Session &session) -> Result<void>
   {
     if (!session.native)
       return std::unexpected(std::string("cannot validate an empty TLS session"));

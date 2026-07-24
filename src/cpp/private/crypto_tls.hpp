@@ -124,6 +124,7 @@ namespace ianet::crypto::detail
     PeerVerification peer_verification{PeerVerification::certificate_and_identity};
     Profile profile;
     std::vector<std::string> expected_peer_names;
+    std::string authenticated_peer_identity;
     bool authenticated{};
   };
 
@@ -132,7 +133,7 @@ namespace ianet::crypto::detail
   [[nodiscard]] auto create_context(const ContextConfig &config) -> Result<Context>;
   [[nodiscard]] auto create_session(Context &context, std::string_view expected_peer_name = {}) -> Result<Session>;
   [[nodiscard]] auto handshake_step(Session &session) -> Result<HandshakeState>;
-  [[nodiscard]] auto validate_profile(const Session &session) -> Result<void>;
+  [[nodiscard]] auto validate_profile(Session &session) -> Result<void>;
   [[nodiscard]] auto write_step(Session &session, std::span<const std::uint8_t> plaintext) -> Result<IoResult>;
   [[nodiscard]] auto read_step(Session &session, std::span<std::uint8_t> plaintext) -> Result<IoResult>;
   [[nodiscard]] auto shutdown_step(Session &session) -> Result<ShutdownState>;

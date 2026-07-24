@@ -127,6 +127,8 @@ export namespace ianet::crypto
 
   [[nodiscard]] auto tls_handshake_step(TlsSession &session) -> Result<TlsHandshakeState>;
   [[nodiscard]] auto tls_negotiated_profile(TlsSession &session) -> Result<TlsNegotiatedProfile>;
+  /** @brief Returns the configured peer identity that matched the authenticated certificate. */
+  [[nodiscard]] auto tls_authenticated_peer_identity(const TlsSession &session) -> Result<String>;
   [[nodiscard]] auto tls_write_step(TlsSession &session, Span<const u8> plaintext) -> Result<TlsIoResult>;
   [[nodiscard]] auto tls_read_step(TlsSession &session, Span<u8> plaintext) -> Result<TlsIoResult>;
   [[nodiscard]] auto tls_shutdown_step(TlsSession &session) -> Result<TlsShutdownState>;

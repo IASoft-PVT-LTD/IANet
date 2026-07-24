@@ -108,7 +108,7 @@ namespace ianet
     }
 
     auto server = make_box<SocketServer_T>();
-    server->sock = listen_sock;
+    server->sock.store(listen_sock);
     server->protocol = protocol;
     server->port = port;
     return server;
@@ -120,11 +120,17 @@ namespace ianet
       return fail("accept is not supported for UDP servers");
 
 #if AU_PLATFORM_WINDOWS
-    const NativeSocket client_sock = accept(server->sock, nullptr, nullptr);
+    const auto listen_socket = server->sock.load();
+    if (!native_socket_valid(listen_socket))
+      return fail("accept failed: server is closed");
+    const NativeSocket client_sock = accept(listen_socket, nullptr, nullptr);
     if (client_sock == INVALID_SOCKET)
       return fail("accept failed: {}", WSAGetLastError());
 #else
-    const NativeSocket client_sock = ::accept(server->sock, nullptr, nullptr);
+    const auto listen_socket = server->sock.load();
+    if (!native_socket_valid(listen_socket))
+      return fail("accept failed: server is closed");
+    const NativeSocket client_sock = ::accept(listen_socket, nullptr, nullptr);
     if (!native_socket_valid(client_sock))
       return fail("accept failed: {}", errno);
 #endif
@@ -133,5 +139,21 @@ namespace ianet
     if (conn.is_err())
       native_socket_close(client_sock);
     return conn;
+  }
+
+  auto socket_server_close(SocketServer &server) -> Result<void>
+  {
+    if (!server)
+      return fail("socket server is not initialized");
+    const auto socket = server->sock.exchange(INVALID_NATIVE_SOCKET);
+    if (!native_socket_valid(socket))
+      return {};
+#if AU_PLATFORM_WINDOWS
+    (void) shutdown(socket, SD_BOTH);
+#else
+    (void) ::shutdown(socket, SHUT_RDWR);
+#endif
+    native_socket_close(socket);
+    return {};
   }
 } // namespace ianet

@@ -184,6 +184,16 @@ namespace ianet::crypto
     };
   }
 
+  auto tls_authenticated_peer_identity(const TlsSession &session) -> Result<String>
+  {
+    const auto *impl = session_impl(session);
+    if (impl == nullptr || !impl->authenticated)
+      return fail("crypto TLS session is not authenticated");
+    if (impl->authenticated_peer_identity.empty())
+      return fail("authenticated TLS session has no verified peer identity");
+    return to_string(impl->authenticated_peer_identity);
+  }
+
   auto tls_write_step(TlsSession &session, Span<const u8> plaintext) -> Result<TlsIoResult>
   {
     auto *impl = session_impl(session);
