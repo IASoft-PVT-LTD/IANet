@@ -10,6 +10,14 @@
   </p>
 </div>
 
+> [!WARNING]
+> This repository is now archived. IASoft no longer publishes updates to this library publicly.
+>
+> If you're a current license holder, you should have received an email from IASoft detailing the changes and steps to access the latest source code via IASoft Partner Dashboard alongside a rationale for this decision.
+> (NOTE: IASoft Partner Dashboard was previously called IASoft Client Dashboard).
+>
+> If you'd like to access the latest sources for IASoft libraries, you may contact IASoft for details on enrolling in the IASoft Partner Program.
+
 > [!NOTE]
 > IANet has been migrated to a module-only API.
 >
