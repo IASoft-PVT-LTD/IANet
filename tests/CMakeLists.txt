@@ -8,6 +8,8 @@ set(SRC_FILES
 
     "cpp/tls_tests.cpp"
 
+    "cpp/tls_group_tests.cpp"
+
 )
 
 

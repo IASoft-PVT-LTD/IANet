@@ -40,7 +40,13 @@ namespace
 
   constexpr usize MAX_PUMP_STEPS = 512U;
   constexpr usize MAX_HANDSHAKE_CIPHERTEXT = 4U * 1024U * 1024U;
-  constexpr const char *DEFAULT_GROUP = "X25519MLKEM768";
+  // Offer the post-quantum hybrid group first (kept preferred), then classical
+  // X25519 and P-256 as fallbacks so the handshake still completes against peers
+  // that lack MLKEM support (e.g. OpenSSL 3.0.x nginx, which returns
+  // "no suitable key share" when only X25519MLKEM768 is offered). The names are
+  // the AWS-LC group tokens accepted by SSL_CTX_set1_groups_list (colon list,
+  // first = most preferred).
+  constexpr const char *DEFAULT_GROUP = "X25519MLKEM768:X25519:P-256";
   constexpr const char *DEFAULT_CIPHER = "TLS_CHACHA20_POLY1305_SHA256";
 
   struct SocketTlsContext

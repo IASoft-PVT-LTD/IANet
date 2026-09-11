@@ -25,6 +25,28 @@ namespace ianet::crypto::detail
       return value.find('\0') != std::string_view::npos;
     }
 
+    // The configured key-exchange group is a colon-separated preference list
+    // (e.g. "X25519MLKEM768:X25519:P-256"). The post-handshake profile check
+    // must accept the negotiated group if it is any member of that list, not
+    // only an exact match of the whole string, while still rejecting a peer
+    // that negotiated a group we never offered (anti-downgrade guarantee).
+    auto group_in_list(std::string_view list, std::string_view group) -> bool
+    {
+      if (group.empty())
+        return false;
+      std::size_t start = 0U;
+      for (;;)
+      {
+        const std::size_t colon = list.find(':', start);
+        const std::size_t end = colon == std::string_view::npos ? list.size() : colon;
+        if (list.substr(start, end - start) == group)
+          return true;
+        if (colon == std::string_view::npos)
+          return false;
+        start = colon + 1U;
+      }
+    }
+
     auto valid_peer_name(std::string_view name) -> bool
     {
       return !name.empty() && name.size() <= 253U && !contains_nul(name) && name.find('*') == std::string_view::npos;
@@ -167,7 +189,7 @@ namespace ianet::crypto::detail
       return std::unexpected(std::string("TLS peer negotiated a disallowed protocol version"));
 
     const char *group_name = SSL_get_group_name(SSL_get_group_id(session.native.get()));
-    if (group_name == nullptr || session.profile.key_exchange_group != group_name)
+    if (group_name == nullptr || !group_in_list(session.profile.key_exchange_group, group_name))
       return std::unexpected(std::string("TLS peer negotiated a disallowed key-exchange group"));
 
     const SSL_CIPHER *cipher = SSL_get_current_cipher(session.native.get());
