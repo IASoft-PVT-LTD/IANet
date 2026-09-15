@@ -400,6 +400,8 @@ namespace ianet
                 .trust_store_file = config.ca_file,
             },
         .profile = make_profile(),
+        .identity_matching = config.allow_wildcard_peer_names ? crypto::TlsIdentityMatching::wildcard
+                                                              : crypto::TlsIdentityMatching::exact,
     };
     auto result = crypto::create_tls_context(crypto_config);
     if (result.is_err())

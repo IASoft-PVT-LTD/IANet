@@ -42,6 +42,10 @@ export namespace ianet
     String key_file;           ///< Path to PEM private key (required for servers).
     String ca_file;            ///< Path to PEM CA bundle (required for client verification).
     String expected_peer_name; ///< Client-side DNS/IP identity; defaults to the connection address.
+    /// Client-side: also accept a single-label RFC 6125 wildcard subjectAltName
+    /// (`*.example.com` for `api.example.com`) as public CAs issue. Off by default;
+    /// private PKIs (IATunnel) keep exact matching. Never consults the Subject CN.
+    bool allow_wildcard_peer_names = false;
   };
 
   /// @cond INTERNAL

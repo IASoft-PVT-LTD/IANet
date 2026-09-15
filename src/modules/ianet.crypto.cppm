@@ -84,6 +84,18 @@ export namespace ianet::crypto
     String cipher_suite;
   };
 
+  /** @brief How a client matches the server certificate against the expected DNS name.
+   *  `exact` accepts only an exact subjectAltName dNSName (the default; keep it for
+   *  private PKIs such as IATunnel). `wildcard` additionally accepts a single-label
+   *  RFC 6125 wildcard (`*.example.com` for `api.example.com`), which public CAs
+   *  issue routinely; partial-label wildcards stay rejected and the Subject CN is
+   *  never consulted in either mode. */
+  enum class TlsIdentityMatching
+  {
+    exact,
+    wildcard,
+  };
+
   struct TlsContextConfig
   {
     TlsRole role{};
@@ -91,6 +103,7 @@ export namespace ianet::crypto
     TlsCredentials credentials;
     TlsProfile profile;
     Vec<String> allowed_peer_names;
+    TlsIdentityMatching identity_matching{TlsIdentityMatching::exact};
   };
 
   struct TlsNegotiatedProfile
