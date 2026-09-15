@@ -29,6 +29,12 @@ namespace ianet::crypto
       return role == TlsRole::client ? detail::Role::client : detail::Role::server;
     }
 
+    auto to_detail_identity_matching(TlsIdentityMatching matching) -> detail::IdentityMatching
+    {
+      return matching == TlsIdentityMatching::wildcard ? detail::IdentityMatching::wildcard
+                                                       : detail::IdentityMatching::exact;
+    }
+
     auto to_detail_verification(TlsPeerVerification verification) -> detail::PeerVerification
     {
       switch (verification)
@@ -118,6 +124,7 @@ namespace ianet::crypto
                 .cipher_suite = to_std_string(config.profile.cipher_suite),
             },
     };
+    internal.identity_matching = to_detail_identity_matching(config.identity_matching);
     internal.allowed_peer_names.reserve(config.allowed_peer_names.size());
     for (const String &name : config.allowed_peer_names)
       internal.allowed_peer_names.push_back(to_std_string(name));

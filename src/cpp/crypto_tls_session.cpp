@@ -18,7 +18,16 @@ namespace ianet::crypto::detail
 {
   namespace
   {
-    constexpr unsigned int STRICT_IDENTITY_FLAGS = X509_CHECK_FLAG_NEVER_CHECK_SUBJECT | X509_CHECK_FLAG_NO_WILDCARDS;
+    // Exact matching: subjectAltName only, no wildcards at all (IATunnel peers).
+    // Wildcard matching: subjectAltName only, single-label `*.` wildcards per
+    // RFC 6125 (what browsers and curl accept); partial-label wildcards such as
+    // `f*o.example.com` stay rejected.
+    auto identity_flags(IdentityMatching matching) -> unsigned int
+    {
+      if (matching == IdentityMatching::wildcard)
+        return X509_CHECK_FLAG_NEVER_CHECK_SUBJECT | X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS;
+      return X509_CHECK_FLAG_NEVER_CHECK_SUBJECT | X509_CHECK_FLAG_NO_WILDCARDS;
+    }
 
     auto contains_nul(std::string_view value) -> bool
     {
@@ -58,14 +67,16 @@ namespace ianet::crypto::detail
       return inet_pton(AF_INET, name, storage.data()) == 1 || inet_pton(AF_INET6, name, storage.data()) == 1;
     }
 
-    auto certificate_matches_name(const X509 *certificate, const std::string &name) -> bool
+    auto certificate_matches_name(const X509 *certificate, const std::string &name, IdentityMatching matching)
+        -> bool
     {
       if (is_ip_address(name.c_str()))
         return X509_check_ip_asc(certificate, name.c_str(), 0U) == 1;
-      return X509_check_host(certificate, name.c_str(), name.size(), STRICT_IDENTITY_FLAGS, nullptr) == 1;
+      return X509_check_host(certificate, name.c_str(), name.size(), identity_flags(matching), nullptr) == 1;
     }
 
-    auto configure_client_identity(SSL *ssl, const std::string &expected_name) -> Result<void>
+    auto configure_client_identity(SSL *ssl, const std::string &expected_name, IdentityMatching matching)
+        -> Result<void>
     {
       if (is_ip_address(expected_name.c_str()))
       {
@@ -74,7 +85,7 @@ namespace ianet::crypto::detail
         return {};
       }
 
-      SSL_set_hostflags(ssl, STRICT_IDENTITY_FLAGS);
+      SSL_set_hostflags(ssl, identity_flags(matching));
       if (SSL_set1_host(ssl, expected_name.c_str()) != 1)
         return std::unexpected(format_error("configure expected server DNS identity"));
       if (SSL_set_tlsext_host_name(ssl, expected_name.c_str()) != 1)
@@ -93,7 +104,7 @@ namespace ianet::crypto::detail
     {
       for (const std::string &name : session.expected_peer_names)
       {
-        if (certificate_matches_name(certificate, name))
+        if (certificate_matches_name(certificate, name, session.identity_matching))
         {
           session.authenticated_peer_identity = name;
           return {};
@@ -146,7 +157,8 @@ namespace ianet::crypto::detail
       if (context.peer_verification == PeerVerification::certificate_and_identity)
       {
         expected_names.emplace_back(expected_peer_name);
-        auto identity_result = configure_client_identity(ssl.get(), expected_names.front());
+        auto identity_result =
+            configure_client_identity(ssl.get(), expected_names.front(), context.identity_matching);
         if (!identity_result)
           return std::unexpected(std::move(identity_result.error()));
       }
@@ -172,7 +184,8 @@ namespace ianet::crypto::detail
                     context.profile,
                     std::move(expected_names),
                     std::string{},
-                    false};
+                    false,
+                    context.identity_matching};
     session.inbound = SSL_get_rbio(session.native.get());
     session.outbound = SSL_get_wbio(session.native.get());
     clear_errors();

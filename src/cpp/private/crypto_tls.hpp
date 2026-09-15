@@ -30,6 +30,17 @@ namespace ianet::crypto::detail
     certificate_and_identity,
   };
 
+  // How a client matches the server certificate against the expected DNS name.
+  // `exact` (default, IATunnel) accepts only an exact subjectAltName dNSName;
+  // `wildcard` also accepts a single-label RFC 6125 wildcard (`*.example.com`
+  // matches `api.example.com`, never `a.b.example.com`, never partial labels).
+  // The Subject CN is never consulted in either mode.
+  enum class IdentityMatching
+  {
+    exact,
+    wildcard,
+  };
+
   enum class HandshakeState
   {
     needs_input,
@@ -78,6 +89,7 @@ namespace ianet::crypto::detail
     Credentials credentials;
     Profile profile;
     std::vector<std::string> allowed_peer_names;
+    IdentityMatching identity_matching{IdentityMatching::exact};
   };
 
   struct SslContextDeleter
@@ -113,6 +125,7 @@ namespace ianet::crypto::detail
     PeerVerification peer_verification{PeerVerification::certificate_and_identity};
     Profile profile;
     std::vector<std::string> allowed_peer_names;
+    IdentityMatching identity_matching{IdentityMatching::exact};
   };
 
   struct Session
@@ -126,6 +139,7 @@ namespace ianet::crypto::detail
     std::vector<std::string> expected_peer_names;
     std::string authenticated_peer_identity;
     bool authenticated{};
+    IdentityMatching identity_matching{IdentityMatching::exact};
   };
 
   auto clear_errors() noexcept -> void;

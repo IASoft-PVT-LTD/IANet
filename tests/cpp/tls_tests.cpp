@@ -158,6 +158,81 @@ namespace
     return block.check(server_ok.load(), "server_ok");
   }
 
+  // Handshake-only probe against the wildcard fixture (`DNS:*.example.test`,
+  // self-signed, its own trust anchor). The client dials 127.0.0.1 but asserts the
+  // DNS identity `expected_name`; `allow_wildcard` selects the client matching
+  // mode. Returns true when the handshake outcome equals `expect_ok`.
+  auto run_tls_identity(u16 port_base, test::Block &block, const char *expected_name, bool allow_wildcard,
+                        bool expect_ok) -> bool
+  {
+    auto ctx_r = create_context();
+    if (!block.check(ctx_r.is_ok(), "create_context().is_ok()"))
+      return false;
+    auto ctx = std::move(ctx_r.unwrap());
+
+    TlsConfig srv_cfg;
+    srv_cfg.cert_file = "tests/fixtures/wildcard.crt";
+    srv_cfg.key_file = "tests/fixtures/wildcard.key";
+    auto srv_tls_r = create_tls_server_context(srv_cfg);
+    if (!block.check(srv_tls_r.is_ok(), "create_tls_server_context(wildcard).is_ok()"))
+      return false;
+    auto srv_tls = std::move(srv_tls_r.unwrap());
+
+    TlsConfig cli_cfg;
+    cli_cfg.verify_mode = ETlsVerifyMode::Required;
+    cli_cfg.ca_file = "tests/fixtures/wildcard.crt";
+    cli_cfg.expected_peer_name = String(expected_name);
+    cli_cfg.allow_wildcard_peer_names = allow_wildcard;
+    auto cli_tls_r = create_tls_client_context(cli_cfg);
+    if (!block.check(cli_tls_r.is_ok(), "create_tls_client_context(identity).is_ok()"))
+      return false;
+    auto cli_tls = std::move(cli_tls_r.unwrap());
+
+    std::optional<SocketServer> srv_opt;
+    u16 port_used = 0;
+    for (u16 delta = 0; delta < 48; ++delta)
+    {
+      const u16 port = static_cast<u16>(port_base + delta);
+      auto srv_r = create_socket_server(ctx, EProtocolType::TCP, port);
+      if (srv_r.is_ok())
+      {
+        srv_opt = std::move(srv_r.unwrap());
+        port_used = port;
+        break;
+      }
+    }
+    if (!block.check(srv_opt.has_value(), "srv_opt.has_value()"))
+      return false;
+
+    auto cli_r = create_socket_client(ctx, EProtocolType::TCP);
+    if (!block.check(cli_r.is_ok(), "create_socket_client().is_ok()"))
+      return false;
+    auto cli = std::move(cli_r.unwrap());
+    auto srv = std::move(*srv_opt);
+
+    // The server side simply completes (or fails) one handshake; a rejected
+    // identity surfaces on the client, so the server outcome is not asserted.
+    std::thread worker([&srv, &srv_tls]() {
+      auto acc_r = tls_server_accept(srv, srv_tls);
+      if (acc_r.is_ok())
+      {
+        auto conn_s = std::move(acc_r.unwrap());
+        const u8 pong[] = {'p', 'o', 'n', 'g'};
+        (void)connection_send(conn_s, Span<const u8>(pong, 4));
+      }
+    });
+
+    auto conn_c_r = tls_client_connect(cli, String("127.0.0.1"), port_used, cli_tls);
+    const bool ok = conn_c_r.is_ok();
+    if (ok)
+    {
+      auto conn_c = std::move(conn_c_r.unwrap());
+      (void)connection_receive(conn_c, 4);
+    }
+    worker.join();
+    return block.check(ok == expect_ok, expect_ok ? "wildcard identity accepted" : "identity rejected");
+  }
+
   struct TlsSuiteBlock final : test::Block
   {
     [[nodiscard]] auto get_name() const -> const char * override
@@ -168,11 +243,32 @@ namespace
     auto declare_tests() -> void override
     {
       add_test("tls_echo_loopback", [this] { return tls_echo_loopback(); });
+      add_test("tls_wildcard_rejected_by_default", [this] { return tls_wildcard_rejected_by_default(); });
+      add_test("tls_wildcard_accepted_when_enabled", [this] { return tls_wildcard_accepted_when_enabled(); });
+      add_test("tls_wildcard_single_label_only", [this] { return tls_wildcard_single_label_only(); });
     }
 
     auto tls_echo_loopback() -> bool
     {
       return run_tls_echo(TLS_EPHEMERAL_BASE, *this);
+    }
+
+    // Default (exact) matching: `*.example.test` must NOT satisfy `api.example.test`.
+    auto tls_wildcard_rejected_by_default() -> bool
+    {
+      return run_tls_identity(static_cast<u16>(TLS_EPHEMERAL_BASE + 400), *this, "api.example.test", false, false);
+    }
+
+    // Opt-in wildcard matching: `*.example.test` satisfies `api.example.test`.
+    auto tls_wildcard_accepted_when_enabled() -> bool
+    {
+      return run_tls_identity(static_cast<u16>(TLS_EPHEMERAL_BASE + 448), *this, "api.example.test", true, true);
+    }
+
+    // Even with wildcards enabled, `*.example.test` never matches a deeper name.
+    auto tls_wildcard_single_label_only() -> bool
+    {
+      return run_tls_identity(static_cast<u16>(TLS_EPHEMERAL_BASE + 496), *this, "a.b.example.test", true, false);
     }
   };
 

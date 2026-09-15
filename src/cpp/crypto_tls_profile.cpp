@@ -160,7 +160,8 @@ namespace ianet::crypto::detail
       return failure("load TLS trust store");
 
     clear_errors();
-    return Context{std::move(context), config.role, config.peer_verification, config.profile,
-                   config.allowed_peer_names};
+    return Context{std::move(context),        config.role,
+                   config.peer_verification,  config.profile,
+                   config.allowed_peer_names, config.identity_matching};
   }
 } // namespace ianet::crypto::detail
