@@ -23,6 +23,8 @@ module ianet.http;
 
 namespace ianet
 {
+  using namespace au;
+
   auto create_http_client(Context &ctx) -> Result<HttpClient>
   {
     (void) ctx;
@@ -41,13 +43,13 @@ namespace ianet
 
     auto sock_cli_r = create_socket_client(ctx, EProtocolType::TCP);
     if (sock_cli_r.is_err())
-      return fail("failed to create socket client: {}", sock_cli_r.error());
+      return fail(std::move(sock_cli_r.unwrap_err()).ctx("failed to create socket client"));
 
     auto sock_cli = std::move(sock_cli_r.unwrap());
 
     auto conn_r = socket_client_connect(sock_cli, address, port);
     if (conn_r.is_err())
-      return fail("failed to connect: {}", conn_r.error());
+      return fail(std::move(conn_r.unwrap_err()).ctx("failed to connect"));
 
     auto http_conn = make_box<HttpConnection_T>();
     http_conn->conn = std::move(conn_r.unwrap());
@@ -58,7 +60,7 @@ namespace ianet
   {
     auto sock_srv_r = create_socket_server(ctx, EProtocolType::TCP, port);
     if (sock_srv_r.is_err())
-      return fail("failed to create socket server: {}", sock_srv_r.error());
+      return fail(std::move(sock_srv_r.unwrap_err()).ctx("failed to create socket server"));
 
     auto server = make_box<HttpServer_T>();
     server->sock_server = std::move(sock_srv_r.unwrap());
@@ -69,7 +71,7 @@ namespace ianet
   {
     auto conn_r = socket_server_accept(server->sock_server);
     if (conn_r.is_err())
-      return fail("failed to accept connection: {}", conn_r.error());
+      return fail(std::move(conn_r.unwrap_err()).ctx("failed to accept connection"));
 
     auto http_conn = make_box<HttpConnection_T>();
     http_conn->conn = std::move(conn_r.unwrap());
@@ -162,7 +164,7 @@ namespace ianet
     {
       auto recv_r = connection_receive(conn->conn, 4096);
       if (recv_r.is_err())
-        return fail("failed to receive: {}", recv_r.error());
+        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive"));
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -235,7 +237,7 @@ namespace ianet
       usize to_read = content_length - res.body.size();
       auto recv_r = connection_receive(conn->conn, to_read);
       if (recv_r.is_err())
-        return fail("failed to receive body: {}", recv_r.error());
+        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive body"));
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -265,7 +267,7 @@ namespace ianet
     {
       auto recv_r = connection_receive(conn->conn, 4096);
       if (recv_r.is_err())
-        return fail("failed to receive: {}", recv_r.error());
+        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive"));
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())
@@ -338,7 +340,7 @@ namespace ianet
       usize to_read = content_length - req.body.size();
       auto recv_r = connection_receive(conn->conn, to_read);
       if (recv_r.is_err())
-        return fail("failed to receive body: {}", recv_r.error());
+        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive body"));
 
       auto chunk = std::move(recv_r.unwrap());
       if (chunk.empty())

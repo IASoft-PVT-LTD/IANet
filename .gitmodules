@@ -1,4 +1,4 @@
 [submodule "libauxid"]
 	path = libauxid
-	url = https://github.com/I-A-S/Auxid
+	url = https://github.com/IASoft-PVT-LTD/Auxid.git
 	

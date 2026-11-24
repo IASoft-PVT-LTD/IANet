@@ -110,13 +110,13 @@ namespace
     {
       auto result = tls::take_tls_ciphertext(session.session);
       if (result.is_err())
-        return fail(result.error());
+        return fail(std::move(result.unwrap_err()));
       auto ciphertext = std::move(result.unwrap());
       if (ciphertext.empty())
         return fail("TLS output reported pending ciphertext but returned none");
       auto send_result = raw_send_all(*session.socket, Span<const u8>(ciphertext.data(), ciphertext.size()));
       if (send_result.is_err())
-        return fail(send_result.error());
+        return fail(std::move(send_result.unwrap_err()));
       total += ciphertext.size();
     }
     return total;
@@ -144,7 +144,7 @@ namespace
     auto result =
         tls::provide_tls_ciphertext(session.session, Span<const u8>(buffer.data(), static_cast<usize>(received)));
     if (result.is_err())
-      return fail(result.error());
+      return fail(std::move(result.unwrap_err()));
     return static_cast<usize>(received);
   }
 
@@ -155,10 +155,10 @@ namespace
     {
       auto handshake = tls::tls_handshake_step(session.session);
       if (handshake.is_err())
-        return fail(handshake.error());
+        return fail(std::move(handshake.unwrap_err()));
       auto flushed = flush_ciphertext(session);
       if (flushed.is_err())
-        return fail(flushed.error());
+        return fail(std::move(flushed.unwrap_err()));
       if (handshake.unwrap() == tls::TlsHandshakeState::complete)
         return Result<void>();
       if (handshake.unwrap() == tls::TlsHandshakeState::needs_output)
@@ -169,7 +169,7 @@ namespace
       }
       auto received = receive_ciphertext(session);
       if (received.is_err())
-        return fail(received.error());
+        return fail(std::move(received.unwrap_err()));
       received_total += received.unwrap();
       if (received_total > MAX_HANDSHAKE_CIPHERTEXT)
         return fail("TLS handshake exceeded ciphertext limit");
@@ -185,19 +185,19 @@ namespace
     {
       auto write = tls::tls_write_step(session.session, plaintext.subspan(offset));
       if (write.is_err())
-        return fail(write.error());
+        return fail(std::move(write.unwrap_err()));
       const tls::TlsIoResult io = write.unwrap();
       offset += io.size;
       auto flushed = flush_ciphertext(session);
       if (flushed.is_err())
-        return fail(flushed.error());
+        return fail(std::move(flushed.unwrap_err()));
       if (io.state == tls::TlsIoState::closed)
         return fail("TLS peer closed during write");
       if (io.state == tls::TlsIoState::needs_input)
       {
         auto received = receive_ciphertext(session);
         if (received.is_err())
-          return fail(received.error());
+          return fail(std::move(received.unwrap_err()));
       }
       else if (io.state == tls::TlsIoState::needs_output && flushed.unwrap() == 0U)
       {
@@ -221,11 +221,11 @@ namespace
     {
       auto read = tls::tls_read_step(session.session, plaintext);
       if (read.is_err())
-        return fail(read.error());
+        return fail(std::move(read.unwrap_err()));
       const tls::TlsIoResult io = read.unwrap();
       auto flushed = flush_ciphertext(session);
       if (flushed.is_err())
-        return fail(flushed.error());
+        return fail(std::move(flushed.unwrap_err()));
       if (io.state == tls::TlsIoState::complete)
       {
         read_size = io.size;
@@ -237,7 +237,7 @@ namespace
       {
         auto received = receive_ciphertext(session);
         if (received.is_err())
-          return fail(received.error());
+          return fail(std::move(received.unwrap_err()));
       }
       else if (flushed.unwrap() == 0U)
       {
@@ -250,10 +250,10 @@ namespace
   {
     auto shutdown = tls::tls_shutdown_step(session.session);
     if (shutdown.is_err())
-      return fail(shutdown.error());
+      return fail(std::move(shutdown.unwrap_err()));
     auto flushed = flush_ciphertext(session);
     if (flushed.is_err())
-      return fail(flushed.error());
+      return fail(std::move(flushed.unwrap_err()));
     return Result<void>();
   }
 
@@ -290,7 +290,7 @@ extern "C"
     auto result = send_plaintext(*session, Span<const u8>(data, length));
     if (result.is_err())
     {
-      copy_error(error_buffer, error_buffer_size, to_std_string(result.error()));
+      copy_error(error_buffer, error_buffer_size, to_std_string(result.error().describe()));
       return -1;
     }
     return 0;
@@ -309,7 +309,7 @@ extern "C"
     auto result = receive_plaintext(*session, Span<u8>(buffer, length), read_size);
     if (result.is_err())
     {
-      copy_error(error_buffer, error_buffer_size, to_std_string(result.error()));
+      copy_error(error_buffer, error_buffer_size, to_std_string(result.error().describe()));
       return -1;
     }
     *out_read = read_size;
@@ -348,14 +348,14 @@ namespace ianet
 
     auto session_result = crypto::create_tls_session(context->context, peer_name);
     if (session_result.is_err())
-      return fail(session_result.error());
+      return fail(std::move(session_result.unwrap_err()));
     auto session = std::unique_ptr<SocketTlsSession>(new (std::nothrow)
                                                          SocketTlsSession{std::move(session_result.unwrap()), socket});
     if (!session)
       return fail("allocate socket TLS session failed");
     auto handshake = pump_handshake(*session);
     if (handshake.is_err())
-      return fail(handshake.error());
+      return fail(std::move(handshake.unwrap_err()));
     return session.release();
   }
 
@@ -376,7 +376,7 @@ namespace ianet
     };
     auto result = crypto::create_tls_context(crypto_config);
     if (result.is_err())
-      return fail(result.error());
+      return fail(std::move(result.unwrap_err()));
     auto impl =
         std::unique_ptr<SocketTlsContext>(new (std::nothrow) SocketTlsContext{std::move(result.unwrap()), true, {}});
     if (!impl)
@@ -405,7 +405,7 @@ namespace ianet
     };
     auto result = crypto::create_tls_context(crypto_config);
     if (result.is_err())
-      return fail(result.error());
+      return fail(std::move(result.unwrap_err()));
     auto impl = std::unique_ptr<SocketTlsContext>(
         new (std::nothrow) SocketTlsContext{std::move(result.unwrap()), false, config.expected_peer_name});
     if (!impl)
@@ -421,13 +421,13 @@ namespace ianet
       return fail("TLS context is configured for server use");
     auto connection_result = socket_client_connect(client, address, port);
     if (connection_result.is_err())
-      return fail("failed to connect: {}", connection_result.error());
+      return fail(std::move(connection_result.unwrap_err()).ctx("failed to connect"));
     auto connection = std::move(connection_result.unwrap());
     auto *context = static_cast<SocketTlsContext *>(__tls_context_impl(tls));
     const String &peer_name = context->expected_peer_name.empty() ? address : context->expected_peer_name;
     auto session_result = __setup_tls_session(&connection->sock, tls, peer_name);
     if (session_result.is_err())
-      return fail(session_result.error());
+      return fail(std::move(session_result.unwrap_err()));
     connection->tls = session_result.unwrap();
     return connection;
   }
@@ -438,11 +438,11 @@ namespace ianet
       return fail("TLS context is configured for client use");
     auto connection_result = socket_server_accept(server);
     if (connection_result.is_err())
-      return fail("failed to accept connection: {}", connection_result.error());
+      return fail(std::move(connection_result.unwrap_err()).ctx("failed to accept connection"));
     auto connection = std::move(connection_result.unwrap());
     auto session_result = __setup_tls_session(&connection->sock, tls, String{});
     if (session_result.is_err())
-      return fail(session_result.error());
+      return fail(std::move(session_result.unwrap_err()));
     connection->tls = session_result.unwrap();
     return connection;
   }

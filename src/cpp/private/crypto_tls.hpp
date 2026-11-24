@@ -4,11 +4,12 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <memory>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <variant>
 #include <vector>
 
 namespace ianet::crypto::detail
@@ -116,7 +117,72 @@ namespace ianet::crypto::detail
   using SslPtr = std::unique_ptr<SSL, SslDeleter>;
   using BioPtr = std::unique_ptr<BIO, BioDeleter>;
   using X509Ptr = std::unique_ptr<X509, X509Deleter>;
-  template<typename T> using Result = std::expected<T, std::string>;
+
+  struct Failure
+  {
+    std::string message;
+  };
+
+  // The part of std::expected (C++23) that the TLS code needs. Auxid's Result is not
+  // available here: this header is included in global module fragments.
+  template<typename T> class Result
+  {
+public:
+    Result(T value) : m_state(std::in_place_index<0>, std::move(value))
+    {
+    }
+
+    Result(Failure failure) : m_state(std::in_place_index<1>, std::move(failure.message))
+    {
+    }
+
+    explicit operator bool() const noexcept
+    {
+      return m_state.index() == 0U;
+    }
+
+    auto value() noexcept -> T &
+    {
+      return *std::get_if<0>(&m_state);
+    }
+
+    auto operator->() noexcept -> T *
+    {
+      return std::get_if<0>(&m_state);
+    }
+
+    auto error() noexcept -> std::string &
+    {
+      return *std::get_if<1>(&m_state);
+    }
+
+private:
+    std::variant<T, std::string> m_state;
+  };
+
+  template<> class Result<void>
+  {
+public:
+    Result() = default;
+
+    Result(Failure failure) : m_error(std::move(failure.message)), m_failed(true)
+    {
+    }
+
+    explicit operator bool() const noexcept
+    {
+      return !m_failed;
+    }
+
+    auto error() noexcept -> std::string &
+    {
+      return m_error;
+    }
+
+private:
+    std::string m_error;
+    bool m_failed{};
+  };
 
   struct Context
   {
