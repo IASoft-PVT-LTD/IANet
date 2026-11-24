@@ -29,6 +29,14 @@ if(NOT TARGET ssl OR NOT TARGET crypto)
   message(FATAL_ERROR "IANET: AWS-LC did not provide its ssl and crypto targets")
 endif()
 
+# Auxid's MSVC toolchain drops CMake's default /EHsc, and AWS-LC treats the
+# resulting C4577 warnings as errors.
+if(MSVC)
+  foreach(target ssl crypto)
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
+  endforeach()
+endif()
+
 add_library(IANET_CryptoProvider INTERFACE)
 target_link_libraries(IANET_CryptoProvider INTERFACE ssl crypto)
 add_library(IANET::CryptoProvider ALIAS IANET_CryptoProvider)
