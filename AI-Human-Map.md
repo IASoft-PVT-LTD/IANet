@@ -10,13 +10,13 @@ Claude Fable 5 wrote most of the TLS and crypto code on 2026-07-18. Its first fo
 
 | | Human | Claude Fable 5 | Claude Fable 5.1 | Claude Opus 5.5 | All AI |
 | --- | --- | --- | --- | --- | --- |
-| Whole repository, 5,337 lines | **57.2%** | 26.8% | 4.7% | 11.4% | **42.8%** |
+| Whole repository, 5,344 lines | **57.1%** | 26.7% | 4.7% | 11.5% | **42.9%** |
 | Library only, 3,026 lines | **46.4%** | 45.7% | 3.0% | 4.9% | **53.6%** |
-| AI commits | | 6 | 2 | 4 | 12 |
+| AI commits | | 6 | 2 | 5 | 13 |
 
 The first commit marked as AI is from 2026-07-18. Percentages are rounded and may not add up to exactly 100.
 
-These numbers follow moved and copied lines back to their source. Without that, AI is 43.7% of the repository instead of 42.8%.
+These numbers follow moved and copied lines back to their source. Without that, AI is 43.8% of the repository instead of 42.9%.
 
 ## By area
 
@@ -24,10 +24,10 @@ These numbers follow moved and copied lines back to their source. Without that, 
 | --- | --- | --- | --- | --- | --- | --- |
 | Library | 3,026 | 1,404 (46.4%) | 1,384 (45.7%) | 90 (3.0%) | 148 (4.9%) | 4 of 16 |
 | Tests | 909 | 751 (82.6%) | 0 (0.0%) | 158 (17.4%) | 0 (0.0%) | 3 of 5 |
-| Build files and presets | 677 | 641 (94.7%) | 35 (5.2%) | 1 (0.1%) | 0 (0.0%) | 2 of 6 |
+| Build files and presets | 684 | 641 (93.7%) | 35 (5.1%) | 1 (0.1%) | 7 (1.0%) | 2 of 6 |
 | CI, tools and config | 510 | 146 (28.6%) | 0 (0.0%) | 0 (0.0%) | 364 (71.4%) | 5 of 8 |
 | README and docs | 215 | 110 (51.2%) | 9 (4.2%) | 0 (0.0%) | 96 (44.7%) | 1 of 4 |
-| **Total** | 5,337 | 3,052 (57.2%) | 1,428 (26.8%) | 249 (4.7%) | 608 (11.4%) | 15 of 39 |
+| **Total** | 5,344 | 3,052 (57.1%) | 1,428 (26.7%) | 249 (4.7%) | 615 (11.5%) | 15 of 39 |
 
 ## Files with AI-written lines
 
@@ -61,7 +61,7 @@ Each count is the number of lines that survive today. The few human lines in fil
 
 | File | Lines | Human | Claude Fable 5 | Claude Fable 5.1 | Claude Opus 5.5 |
 | --- | --- | --- | --- | --- | --- |
-| [cmake/find_deps.cmake](cmake/find_deps.cmake) | 29 | 1 (3%) | 28 | 0 | 0 |
+| [cmake/find_deps.cmake](cmake/find_deps.cmake) | 36 | 1 (3%) | 28 | 0 | 7 |
 | [src/CMakeLists.txt](src/CMakeLists.txt) | 30 | 23 (77%) | 7 | 0 | 0 |
 | [tests/CMakeLists.txt](tests/CMakeLists.txt) | 14 | 13 (93%) | 0 | 1 | 0 |
 
@@ -101,6 +101,7 @@ Commits that only change this file are left out.
 
 | Commit | Date | Model | Author | Subject |
 | --- | --- | --- | --- | --- |
+| `0b22aaf` | 2026-11-25 | Claude Opus 5.5 | Claude | [FIX]: CI - Build AWS-LC With /EHsc On MSVC |
 | `b6bb8ff` | 2026-11-24 | Claude Opus 5.5 | Claude | [MAINTAIN]: Rewrite README, Update Docs Pages |
 | `1983416` | 2026-11-24 | Claude Opus 5.5 | Claude | [CI]: Add tools/authorship_map.py And Its Check, Build At C++20 And C++23 |
 | `ee71c25` | 2026-11-24 | Claude Opus 5.5 | Claude | [LEGAL]: Relicense Under The Apache License 2.0 |
