@@ -6,9 +6,9 @@ through `import ianet.tls`, and a provider-neutral memory-BIO crypto API through
 memory-BIO API to sockets while public modules expose only opaque handles,
 Auxid containers, state enums, and `Result<T>` diagnostics.
 
-Cross-platform C++23 networking library for Windows and Linux. IANet provides
+Cross-platform C++20 networking library for Windows and Linux. IANet provides
 socket clients and servers, HTTP/1.x, TLS (via AWS-LC), and HTTPS helpers on
-top of the [Auxid](https://github.com/IASoft-PVT-LTD/libauxid) platform library.
+top of the [Auxid](https://github.com/IASoft-PVT-LTD/Auxid) platform library.
 
 ## Module map
 
@@ -33,8 +33,8 @@ types such as `Result<T>`, `String`, and `MainThreadGuard` in your application.
 ## Requirements
 
 - CMake 3.28+
-- C++23 compiler with module support (MSVC, Clang, GCC)
-- [LibAuxid](https://github.com/IASoft-PVT-LTD/libauxid) (included as submodule)
+- C++20 compiler with module support (MSVC or Clang)
+- [LibAuxid](https://github.com/IASoft-PVT-LTD/Auxid) (included as submodule)
 - Doxygen 1.9.8+ on `PATH` when building API reference (1.11+ recommended)
 
 ## Quick start (CMake)
@@ -42,16 +42,23 @@ types such as `Result<T>`, `String`, and `MainThreadGuard` in your application.
 Integrate IANet with CMake `FetchContent`:
 
 ```cmake
+cmake_minimum_required(VERSION 3.28)
+project(my_app CXX)
+
 include(FetchContent)
 
 FetchContent_Declare(
-    IANET
-    GIT_REPOSITORY https://github.com/IASoft-PVT-LTD/IANet
-    GIT_TAG        main
+  IANet
+  GIT_REPOSITORY https://github.com/IASoft-PVT-LTD/IANet.git
+  GIT_TAG        main  # pin a commit
 )
-FetchContent_MakeAvailable(IANET)
+FetchContent_MakeAvailable(IANet)
 
-target_link_libraries(your_target PRIVATE IANET)
+auxid_setup_project()
+
+add_executable(my_app main.cpp)
+set_target_properties(my_app PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_link_libraries(my_app PRIVATE IANET)
 ```
 
 ### Example
@@ -59,34 +66,37 @@ target_link_libraries(your_target PRIVATE IANET)
 ```cpp
 #include <auxid/macros.hpp>
 
+#include <utility>
+
 import ianet;
 
 using namespace au;
 
-auto app_main() -> Result<void>
+auto say_hello() -> Result<usize>
 {
-  auto ctx = AU_TRY(ianet::create_context());
-  auto client = AU_TRY(ianet::create_socket_client(ctx, ianet::EProtocolType::TCP));
-  auto conn = AU_TRY(ianet::socket_client_connect(client, String("127.0.0.1"), 8080));
+  AU_TRY_VAR(ctx, ianet::create_context());
+  AU_TRY_VAR(client, ianet::create_socket_client(ctx, ianet::EProtocolType::TCP));
+  AU_TRY_VAR(conn, ianet::socket_client_connect(client, String("127.0.0.1"), 8080));
 
   const u8 msg[] = {'h', 'e', 'l', 'l', 'o'};
-  AU_TRY(ianet::connection_send(conn, Span<const u8>(msg, sizeof(msg))));
+  AU_TRY_DISCARD(ianet::connection_send(conn, Span<const u8>(msg)));
 
-  auto reply = AU_TRY(ianet::connection_receive(conn, 1024));
-  return {};
+  AU_TRY_VAR(reply, ianet::connection_receive(conn, 1024));
+  return reply.size();
 }
 
-int main(int argc, char *argv[])
+auto main() -> int
 {
-  auxid::MainThreadGuard _main_thread_guard;
+  auxid::MainThreadGuard guard;
+  Logger &log = auxid::get_thread_logger();
 
-  const auto result = app_main();
-  if (!result)
+  auto received = say_hello();
+  if (received.is_err())
   {
-    auxid::get_thread_logger().error("Application failed with error: %s", result.error().c_str());
+    log.error("{}", received.unwrap_err().describe());
     return 1;
   }
-
+  log.info("received {} bytes", received.unwrap());
   return 0;
 }
 ```
@@ -101,4 +111,4 @@ Browse the generated API pages from the navigation bar, or start with:
 ## License
 
 Copyright © 2026 IASoft (PVT) LTD. Licensed under the
-[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0).
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
