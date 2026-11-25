@@ -110,13 +110,16 @@ export namespace ianet
   /**
    * @brief Receives and parses an HTTP response.
    * @param conn  Active HTTP connection.
-   * @return Parsed response including body (reads until `Content-Length` is satisfied).
+   * @return Parsed response including body (reads until `Content-Length` is satisfied). Fails when
+   *         `Content-Length` is not a plain decimal number or repeated headers disagree.
    */
   auto http_connection_receive_response(HttpConnection &conn) -> Result<HttpResponse>;
 
   /**
    * @brief Receives and parses an HTTP request.
    * @param conn  Active HTTP connection (typically from @ref http_server_accept).
+   * @return Parsed request including body (reads until `Content-Length` is satisfied). Fails when
+   *         `Content-Length` is not a plain decimal number or repeated headers disagree.
    */
   auto http_connection_receive_request(HttpConnection &conn) -> Result<HttpRequest>;
 

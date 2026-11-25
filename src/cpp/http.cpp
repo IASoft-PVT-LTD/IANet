@@ -14,7 +14,10 @@
 
 module;
 
-#include <string>
+#include <algorithm>
+#include <charconv>
+#include <string_view>
+#include <system_error>
 #include <utility>
 
 #include <vendor/picohttpparser/picohttpparser.h>
@@ -24,6 +27,70 @@ module ianet.http;
 namespace ianet
 {
   using namespace au;
+
+  namespace
+  {
+    // Bodies are read in pieces of at most this size, so memory use follows what
+    // the peer actually sends and not the length it claims.
+    constexpr usize MAX_BODY_CHUNK = 64 * 1024;
+
+    auto is_content_length(std::string_view name) -> bool
+    {
+      constexpr std::string_view expected = "content-length";
+      return std::equal(name.begin(), name.end(), expected.begin(), expected.end(), [](char a, char b) {
+        return (a >= 'A' && a <= 'Z' ? static_cast<char>(a + ('a' - 'A')) : a) == b;
+      });
+    }
+
+    // Returns the body length given by the headers, or 0 when they don't give one.
+    // The value has to be digits only, and repeated headers have to agree.
+    auto parse_content_length(const phr_header *headers, size_t num_headers) -> Result<usize>
+    {
+      usize length = 0;
+      bool found = false;
+
+      for (size_t i = 0; i != num_headers; ++i)
+      {
+        if (headers[i].name == nullptr || !is_content_length({headers[i].name, headers[i].name_len}))
+          continue;
+
+        const char *first = headers[i].value;
+        const char *last = first + headers[i].value_len;
+
+        usize value = 0;
+        const auto parsed = std::from_chars(first, last, value);
+        if (parsed.ec != std::errc{} || parsed.ptr != last)
+          return fail("invalid Content-Length header");
+        if (found && value != length)
+          return fail("conflicting Content-Length headers");
+
+        length = value;
+        found = true;
+      }
+
+      return length;
+    }
+
+    // Appends to @p body until it holds @p content_length bytes.
+    auto receive_body(Connection &conn, Vec<u8> &body, usize content_length) -> Result<void>
+    {
+      while (body.size() < content_length)
+      {
+        const usize to_read = std::min(content_length - body.size(), MAX_BODY_CHUNK);
+        auto recv_r = connection_receive(conn, to_read);
+        if (recv_r.is_err())
+          return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive body"));
+
+        auto chunk = std::move(recv_r.unwrap());
+        if (chunk.empty())
+          return fail("connection closed by peer while reading body");
+
+        body.insert(body.end(), chunk.begin(), chunk.end());
+      }
+
+      return Result<void>();
+    }
+  } // namespace
 
   auto create_http_client(Context &ctx) -> Result<HttpClient>
   {
@@ -191,33 +258,15 @@ namespace ianet
     res.status_code = static_cast<u16>(status);
     res.status_message = String(msg, msg_len);
 
-    usize content_length = 0;
+    auto content_length_r = parse_content_length(headers, num_headers);
+    if (content_length_r.is_err())
+      return fail(std::move(content_length_r.unwrap_err()));
+
     for (size_t i = 0; i != num_headers; ++i)
     {
       String name(headers[i].name, headers[i].name_len);
       String value(headers[i].value, headers[i].value_len);
       res.headers.push_back(Pair<String, String>(name, value));
-
-      if (name.size() == 14)
-      {
-        bool match = true;
-        const char *cl = "content-length";
-        for (usize j = 0; j < 14; ++j)
-        {
-          char c = name.data()[j];
-          if (c >= 'A' && c <= 'Z')
-            c += 32;
-          if (c != cl[j])
-          {
-            match = false;
-            break;
-          }
-        }
-        if (match)
-        {
-          content_length = std::stoull(value.c_str());
-        }
-      }
     }
 
     usize header_size = static_cast<usize>(pret);
@@ -232,23 +281,9 @@ namespace ianet
       }
     }
 
-    while (res.body.size() < content_length)
-    {
-      usize to_read = content_length - res.body.size();
-      auto recv_r = connection_receive(conn->conn, to_read);
-      if (recv_r.is_err())
-        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive body"));
-
-      auto chunk = std::move(recv_r.unwrap());
-      if (chunk.empty())
-        return fail("connection closed by peer while reading body");
-
-      res.body.reserve(res.body.size() + chunk.size());
-      for (auto b : chunk)
-      {
-        res.body.push_back(b);
-      }
-    }
+    auto body_r = receive_body(conn->conn, res.body, content_length_r.unwrap());
+    if (body_r.is_err())
+      return fail(std::move(body_r.unwrap_err()));
 
     return res;
   }
@@ -294,33 +329,15 @@ namespace ianet
     req.path = String(path, path_len);
     req.minor_version = minor_version;
 
-    usize content_length = 0;
+    auto content_length_r = parse_content_length(headers, num_headers);
+    if (content_length_r.is_err())
+      return fail(std::move(content_length_r.unwrap_err()));
+
     for (size_t i = 0; i != num_headers; ++i)
     {
       String name(headers[i].name, headers[i].name_len);
       String value(headers[i].value, headers[i].value_len);
       req.headers.push_back(Pair<String, String>(name, value));
-
-      if (name.size() == 14)
-      {
-        bool match = true;
-        const char *cl = "content-length";
-        for (usize j = 0; j < 14; ++j)
-        {
-          char c = name.data()[j];
-          if (c >= 'A' && c <= 'Z')
-            c += 32;
-          if (c != cl[j])
-          {
-            match = false;
-            break;
-          }
-        }
-        if (match)
-        {
-          content_length = std::stoull(value.c_str());
-        }
-      }
     }
 
     usize header_size = static_cast<usize>(pret);
@@ -335,23 +352,9 @@ namespace ianet
       }
     }
 
-    while (req.body.size() < content_length)
-    {
-      usize to_read = content_length - req.body.size();
-      auto recv_r = connection_receive(conn->conn, to_read);
-      if (recv_r.is_err())
-        return fail(std::move(recv_r.unwrap_err()).ctx("failed to receive body"));
-
-      auto chunk = std::move(recv_r.unwrap());
-      if (chunk.empty())
-        return fail("connection closed by peer while reading body");
-
-      req.body.reserve(req.body.size() + chunk.size());
-      for (auto b : chunk)
-      {
-        req.body.push_back(b);
-      }
-    }
+    auto body_r = receive_body(conn->conn, req.body, content_length_r.unwrap());
+    if (body_r.is_err())
+      return fail(std::move(body_r.unwrap_err()));
 
     return req;
   }

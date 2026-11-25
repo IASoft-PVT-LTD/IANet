@@ -9,6 +9,8 @@
 
 #include <atomic>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <thread>
 
 import ianet.http;
@@ -20,6 +22,60 @@ using namespace ianet;
 namespace
 {
   constexpr u16 HTTP_EPHEMERAL_BASE = 39120;
+
+  // Header lines that do not give a usable body length.
+  constexpr const char *BAD_CONTENT_LENGTHS[] = {
+      "Content-Length:\r\n",
+      "Content-Length: abc\r\n",
+      "Content-Length: 4abc\r\n",
+      "Content-Length: -1\r\n",
+      "Content-Length: +4\r\n",
+      "Content-Length: 0x4\r\n",
+      "Content-Length: 4, 4\r\n",
+      "content-length: 99999999999999999999999999\r\n",
+      "Content-Length: 4\r\nContent-Length: 5\r\n",
+  };
+
+  // Header lines that give the length of the four-byte body.
+  constexpr const char *GOOD_CONTENT_LENGTHS[] = {
+      "Content-Length: 4\r\n",
+      "CONTENT-LENGTH:  0004 \t\r\n",
+      "Content-Length: 4\r\nContent-Length: 4\r\n",
+  };
+
+  // Larger than any allocation that could succeed.
+  constexpr const char *HUGE_CONTENT_LENGTH = "Content-Length: 18446744073709551615\r\n";
+
+  auto send_text(Connection &conn, const std::string &text) -> bool
+  {
+    return connection_send(conn, Span<const u8>(reinterpret_cast<const u8 *>(text.data()), text.size())).is_ok();
+  }
+
+  template<typename T> auto fails_with(Result<T> &result, std::string_view text) -> bool
+  {
+    if (result.is_ok())
+      return false;
+
+    const String message = result.unwrap_err().describe();
+    return std::string_view(message.data(), message.size()).find(text) != std::string_view::npos;
+  }
+
+  auto start_server(Context &ctx, u16 &port_used) -> std::optional<HttpServer>
+  {
+    for (u16 delta = 0; delta < 48; ++delta)
+    {
+      const u16 port = static_cast<u16>(HTTP_EPHEMERAL_BASE + delta);
+
+      auto srv_r = create_http_server(ctx, port);
+      if (srv_r.is_ok())
+      {
+        port_used = port;
+        return std::move(srv_r.unwrap());
+      }
+    }
+
+    return std::nullopt;
+  }
 
   auto bytes_eq(Span<const u8> a, Span<const u8> b) -> bool
   {
@@ -46,6 +102,163 @@ namespace
     auto declare_tests() -> void override
     {
       add_test("http_ping_pong", [this] { return http_ping_pong(); });
+      add_test("http_request_content_length", [this] { return http_request_content_length(); });
+      add_test("http_response_content_length", [this] { return http_response_content_length(); });
+      add_test("http_large_body", [this] { return http_large_body(); });
+    }
+
+    // Sends a raw request with the given length headers and a four-byte body,
+    // closes the connection, and returns what the server read.
+    auto receive_raw_request(HttpServer &srv, HttpClient &cli, u16 port, const char *length_headers)
+        -> Result<HttpRequest>
+    {
+      auto conn_c_r = http_client_connect(cli, String("127.0.0.1"), port);
+      if (conn_c_r.is_err())
+        return fail("connect failed");
+      auto conn_s_r = http_server_accept(srv);
+      if (conn_s_r.is_err())
+        return fail("accept failed");
+      auto conn_s = std::move(conn_s_r.unwrap());
+
+      {
+        auto conn_c = std::move(conn_c_r.unwrap());
+        if (!send_text(conn_c->conn, std::string("POST /ping HTTP/1.1\r\n") + length_headers + "\r\nping"))
+          return fail("send failed");
+      }
+
+      return http_connection_receive_request(conn_s);
+    }
+
+    // The same in the other direction, for a response.
+    auto receive_raw_response(HttpServer &srv, HttpClient &cli, u16 port, const char *length_headers)
+        -> Result<HttpResponse>
+    {
+      auto conn_c_r = http_client_connect(cli, String("127.0.0.1"), port);
+      if (conn_c_r.is_err())
+        return fail("connect failed");
+      auto conn_c = std::move(conn_c_r.unwrap());
+
+      {
+        auto conn_s_r = http_server_accept(srv);
+        if (conn_s_r.is_err())
+          return fail("accept failed");
+        auto conn_s = std::move(conn_s_r.unwrap());
+        if (!send_text(conn_s->conn, std::string("HTTP/1.1 200 OK\r\n") + length_headers + "\r\npong"))
+          return fail("send failed");
+      }
+
+      return http_connection_receive_response(conn_c);
+    }
+
+    auto http_request_content_length() -> bool
+    {
+      auto ctx_r = create_context();
+      if (!check(ctx_r.is_ok(), "create_context().is_ok()"))
+        return false;
+      auto ctx = std::move(ctx_r.unwrap());
+
+      u16 port = 0;
+      auto srv = start_server(ctx, port);
+      auto cli_r = create_http_client(ctx);
+      if (!check(srv.has_value() && cli_r.is_ok(), "server and client created"))
+        return false;
+      auto cli = std::move(cli_r.unwrap());
+
+      for (const char *headers : BAD_CONTENT_LENGTHS)
+      {
+        auto req_r = receive_raw_request(*srv, cli, port, headers);
+        if (!check(fails_with(req_r, "Content-Length"), headers))
+          return false;
+      }
+
+      for (const char *headers : GOOD_CONTENT_LENGTHS)
+      {
+        auto req_r = receive_raw_request(*srv, cli, port, headers);
+        if (!check(req_r.is_ok() && req_r.unwrap().body.size() == 4, headers))
+          return false;
+      }
+
+      auto huge_r = receive_raw_request(*srv, cli, port, HUGE_CONTENT_LENGTH);
+      return check(huge_r.is_err(), "a huge Content-Length is an error");
+    }
+
+    auto http_response_content_length() -> bool
+    {
+      auto ctx_r = create_context();
+      if (!check(ctx_r.is_ok(), "create_context().is_ok()"))
+        return false;
+      auto ctx = std::move(ctx_r.unwrap());
+
+      u16 port = 0;
+      auto srv = start_server(ctx, port);
+      auto cli_r = create_http_client(ctx);
+      if (!check(srv.has_value() && cli_r.is_ok(), "server and client created"))
+        return false;
+      auto cli = std::move(cli_r.unwrap());
+
+      for (const char *headers : BAD_CONTENT_LENGTHS)
+      {
+        auto res_r = receive_raw_response(*srv, cli, port, headers);
+        if (!check(fails_with(res_r, "Content-Length"), headers))
+          return false;
+      }
+
+      for (const char *headers : GOOD_CONTENT_LENGTHS)
+      {
+        auto res_r = receive_raw_response(*srv, cli, port, headers);
+        if (!check(res_r.is_ok() && res_r.unwrap().body.size() == 4, headers))
+          return false;
+      }
+
+      auto huge_r = receive_raw_response(*srv, cli, port, HUGE_CONTENT_LENGTH);
+      return check(huge_r.is_err(), "a huge Content-Length is an error");
+    }
+
+    // A body that takes several reads to receive.
+    auto http_large_body() -> bool
+    {
+      auto ctx_r = create_context();
+      if (!check(ctx_r.is_ok(), "create_context().is_ok()"))
+        return false;
+      auto ctx = std::move(ctx_r.unwrap());
+
+      u16 port = 0;
+      auto srv = start_server(ctx, port);
+      auto cli_r = create_http_client(ctx);
+      if (!check(srv.has_value() && cli_r.is_ok(), "server and client created"))
+        return false;
+      auto cli = std::move(cli_r.unwrap());
+
+      auto conn_c_r = http_client_connect(cli, String("127.0.0.1"), port);
+      if (!check(conn_c_r.is_ok(), "http_client_connect().is_ok()"))
+        return false;
+      auto conn_c = std::move(conn_c_r.unwrap());
+
+      auto conn_s_r = http_server_accept(*srv);
+      if (!check(conn_s_r.is_ok(), "http_server_accept().is_ok()"))
+        return false;
+      auto conn_s = std::move(conn_s_r.unwrap());
+
+      HttpRequest req;
+      req.method = "POST";
+      req.path = "/upload";
+      req.minor_version = 1;
+      for (usize i = 0; i < 300'001; ++i)
+        req.body.push_back(static_cast<u8>(i % 251));
+
+      std::atomic<bool> sent{false};
+      std::thread sender([&conn_c, &req, &sent] { sent = http_connection_send_request(conn_c, req).is_ok(); });
+
+      auto got_r = http_connection_receive_request(conn_s);
+      sender.join();
+
+      if (!check(sent.load() && got_r.is_ok(), "large request sent and received"))
+        return false;
+
+      const auto got = std::move(got_r.unwrap());
+      return check(
+          bytes_eq(Span<const u8>(got.body.data(), got.body.size()), Span<const u8>(req.body.data(), req.body.size())),
+          "large body arrives unchanged");
     }
 
     auto http_ping_pong() -> bool
