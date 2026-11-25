@@ -1,5 +1,5 @@
 site_name: IANet
-site_description: Cross-platform C++23 networking library
+site_description: Cross-platform C++20 networking library
 docs_dir: docs
 use_directory_urls: true
 

@@ -27,9 +27,9 @@ namespace ianet::crypto::detail
       return valid_text(name) && name.size() <= 253U && name.find('*') == std::string_view::npos;
     }
 
-    auto failure(std::string_view operation) -> std::unexpected<std::string>
+    auto failure(std::string_view operation) -> Failure
     {
-      return std::unexpected(format_error(operation));
+      return Failure{format_error(operation)};
     }
   } // namespace
 
@@ -99,28 +99,28 @@ namespace ianet::crypto::detail
   {
     if (contains_nul(config.credentials.certificate_file) || contains_nul(config.credentials.private_key_file) ||
         contains_nul(config.credentials.trust_store_file))
-      return std::unexpected(std::string("TLS credential paths must not contain NUL bytes"));
+      return Failure{"TLS credential paths must not contain NUL bytes"};
     const bool has_certificate = valid_text(config.credentials.certificate_file);
     const bool has_private_key = valid_text(config.credentials.private_key_file);
     if (has_certificate != has_private_key)
-      return std::unexpected(std::string("TLS certificate and private key must be configured together"));
+      return Failure{"TLS certificate and private key must be configured together"};
     if (config.role == Role::server && !has_certificate)
-      return std::unexpected(std::string("server TLS configuration requires a certificate and private key"));
+      return Failure{"server TLS configuration requires a certificate and private key"};
     if (config.peer_verification != PeerVerification::none && !valid_text(config.credentials.trust_store_file))
-      return std::unexpected(std::string("verified TLS configuration requires a trust store"));
+      return Failure{"verified TLS configuration requires a trust store"};
     if (!valid_text(config.profile.key_exchange_group) || !valid_text(config.profile.cipher_suite))
-      return std::unexpected(std::string("TLS profile group and cipher must be non-empty"));
+      return Failure{"TLS profile group and cipher must be non-empty"};
 
     if (config.role == Role::client && !config.allowed_peer_names.empty())
-      return std::unexpected(std::string("client peer identity is configured per TLS session"));
+      return Failure{"client peer identity is configured per TLS session"};
     if (config.role == Role::server && config.peer_verification == PeerVerification::certificate_and_identity)
     {
       if (config.allowed_peer_names.empty())
-        return std::unexpected(std::string("server TLS configuration requires at least one allowed client name"));
+        return Failure{"server TLS configuration requires at least one allowed client name"};
       for (const std::string &name : config.allowed_peer_names)
       {
         if (!valid_peer_name(name))
-          return std::unexpected(std::string("server TLS configuration contains an invalid client name"));
+          return Failure{"server TLS configuration contains an invalid client name"};
       }
     }
 

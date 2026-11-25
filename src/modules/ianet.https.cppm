@@ -3,9 +3,9 @@
 // Copyright (C) 2026 I-A-S (ias@iasoft.dev)
 // Copyright (C) 2026 IASoft (PVT) LTD (contact@iasoft.dev)
 //
-// This source code is licensed under the PolyForm Noncommercial License 1.0.0.
+// This source code is licensed under the Apache License, Version 2.0.
 // A copy of this license is included in the LICENSE file at the root of this project,
-// and is also available at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
+// and is also available at <https://www.apache.org/licenses/LICENSE-2.0>.
 
 module;
 
@@ -49,7 +49,7 @@ export namespace ianet
     auto sock_srv_r = create_socket_server(ctx, EProtocolType::TCP, port);
 
     if (sock_srv_r.is_err())
-      return fail("failed to create socket server: {}", sock_srv_r.error());
+      return fail(std::move(sock_srv_r.unwrap_err()).ctx("failed to create socket server"));
 
     auto server = make_box<HttpsServer_T>();
     server->sock_server = std::move(sock_srv_r.unwrap());
@@ -70,7 +70,7 @@ export namespace ianet
 
     auto conn_r = tls_server_accept(server->sock_server, *server->tls);
     if (conn_r.is_err())
-      return fail("failed to accept TLS connection: {}", conn_r.error());
+      return fail(std::move(conn_r.unwrap_err()).ctx("failed to accept TLS connection"));
 
     auto http_conn = make_box<HttpConnection_T>();
     http_conn->conn = std::move(conn_r.unwrap());
@@ -99,14 +99,14 @@ export namespace ianet
     auto sock_cli_r = create_socket_client(connect_ctx, EProtocolType::TCP);
 
     if (sock_cli_r.is_err())
-      return fail("failed to create socket client: {}", sock_cli_r.error());
+      return fail(std::move(sock_cli_r.unwrap_err()).ctx("failed to create socket client"));
 
     auto sock_cli = std::move(sock_cli_r.unwrap());
 
     auto conn_r = tls_client_connect(sock_cli, address, port, tls);
 
     if (conn_r.is_err())
-      return fail("failed to connect: {}", conn_r.error());
+      return fail(std::move(conn_r.unwrap_err()).ctx("failed to connect"));
 
     auto http_conn = make_box<HttpConnection_T>();
     http_conn->conn = std::move(conn_r.unwrap());

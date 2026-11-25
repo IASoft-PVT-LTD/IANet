@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  authorship-map:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: AI-Human-Map.md is up to date
+        run: python3 tools/authorship_map.py --check
+
+  build-linux:
+    # apt.llvm.org has no LLVM 20 packages for Ubuntu 26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [IANet-x64-linux]
+        std: [20, 23]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install Clang 20
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo ln -sf /usr/bin/clang-20   /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+          clang --version
+          clang++ --version
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.target }} -DCMAKE_CXX_STANDARD=${{ matrix.std }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.target }} --config Release
+
+      - name: Test
+        run: ctest --preset ${{ matrix.target }} --output-on-failure
+
+  sanitizers-linux:
+    # apt.llvm.org has no LLVM 20 packages for Ubuntu 26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [IANet-x64-linux-asan, IANet-x64-linux-ubsan, IANet-x64-linux-tsan]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install Clang 20
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          sudo ln -sf /usr/bin/clang-20   /usr/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/bin/clang++
+          clang --version
+          clang++ --version
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --config RelWithDebInfo
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          TSAN_OPTIONS: halt_on_error=1
+
+  build-windows:
+    # VS 2026's MSVC 14.51 crashes while building Auxid's modules (C1116), so
+    # stay on the v143 toolset.
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [IANet-x64-windows-msvc]
+        std: [20, 23]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      # AWS-LC assembles its Windows x64 code with NASM.
+      - uses: ilammy/setup-nasm@v1
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.target }} -DCMAKE_CXX_STANDARD=${{ matrix.std }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.target }} --config Release
+
+      - name: Test
+        run: ctest --preset ${{ matrix.target }} --output-on-failure
