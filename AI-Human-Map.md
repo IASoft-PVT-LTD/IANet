@@ -10,24 +10,24 @@ Claude Fable 5 wrote most of the TLS and crypto code on 2026-07-18. Its first fo
 
 | | Human | Claude Fable 5 | Claude Fable 5.1 | Claude Opus 5.5 | All AI |
 | --- | --- | --- | --- | --- | --- |
-| Whole repository, 5,344 lines | **57.1%** | 26.7% | 4.7% | 11.5% | **42.9%** |
-| Library only, 3,026 lines | **46.4%** | 45.7% | 3.0% | 4.9% | **53.6%** |
-| AI commits | | 6 | 2 | 5 | 13 |
+| Whole repository, 5,521 lines | **54.5%** | 25.9% | 4.5% | 15.1% | **45.5%** |
+| Library only, 3,024 lines | **44.2%** | 45.8% | 3.0% | 7.0% | **55.8%** |
+| AI commits | | 6 | 2 | 6 | 14 |
 
 The first commit marked as AI is from 2026-07-18. Percentages are rounded and may not add up to exactly 100.
 
-These numbers follow moved and copied lines back to their source. Without that, AI is 43.8% of the repository instead of 42.9%.
+These numbers follow moved and copied lines back to their source. Without that, AI is 46.9% of the repository instead of 45.5%.
 
 ## By area
 
 | Area | Lines | Human | Claude Fable 5 | Claude Fable 5.1 | Claude Opus 5.5 | Files with no AI code commits |
 | --- | --- | --- | --- | --- | --- | --- |
-| Library | 3,026 | 1,404 (46.4%) | 1,384 (45.7%) | 90 (3.0%) | 148 (4.9%) | 4 of 16 |
-| Tests | 909 | 751 (82.6%) | 0 (0.0%) | 158 (17.4%) | 0 (0.0%) | 3 of 5 |
+| Library | 3,024 | 1,338 (44.2%) | 1,384 (45.8%) | 90 (3.0%) | 212 (7.0%) | 3 of 16 |
+| Tests | 1,088 | 775 (71.2%) | 0 (0.0%) | 158 (14.5%) | 155 (14.2%) | 2 of 5 |
 | Build files and presets | 684 | 641 (93.7%) | 35 (5.1%) | 1 (0.1%) | 7 (1.0%) | 2 of 6 |
 | CI, tools and config | 510 | 146 (28.6%) | 0 (0.0%) | 0 (0.0%) | 364 (71.4%) | 5 of 8 |
 | README and docs | 215 | 110 (51.2%) | 9 (4.2%) | 0 (0.0%) | 96 (44.7%) | 1 of 4 |
-| **Total** | 5,344 | 3,052 (57.1%) | 1,428 (26.7%) | 249 (4.7%) | 615 (11.5%) | 15 of 39 |
+| **Total** | 5,521 | 3,010 (54.5%) | 1,428 (25.9%) | 249 (4.5%) | 834 (15.1%) | 13 of 39 |
 
 ## Files with AI-written lines
 
@@ -42,11 +42,12 @@ Each count is the number of lines that survive today. The few human lines in fil
 | [src/cpp/crypto_inner_sealer.cpp](src/cpp/crypto_inner_sealer.cpp) | 177 | 0 (0%) | 177 | 0 | 0 | Fable 5: all of it |
 | [src/cpp/crypto_tls_profile.cpp](src/cpp/crypto_tls_profile.cpp) | 145 | 0 (0%) | 132 | 3 | 10 | Fable 5: TLS context setup. Opus 5.5: C++20 error returns. Fable 5.1: small edits |
 | [src/cpp/crypto_tls_session.cpp](src/cpp/crypto_tls_session.cpp) | 342 | 11 (3%) | 242 | 43 | 46 | Fable 5: TLS sessions. Fable 5.1: group list check, wildcard matching. Opus 5.5: C++20 error returns |
-| [src/cpp/http.cpp](src/cpp/http.cpp) | 290 | 281 (97%) | 0 | 0 | 9 | Opus 5.5: error wrapping |
+| [src/cpp/http.cpp](src/cpp/http.cpp) | 285 | 216 (76%) | 0 | 0 | 69 | Opus 5.5: error wrapping, `Content-Length` parsing, reading the body |
 | [src/cpp/private/crypto_tls.hpp](src/cpp/private/crypto_tls.hpp) | 190 | 2 (1%) | 120 | 13 | 55 | Fable 5: internal TLS types. Fable 5.1: `IdentityMatching`. Opus 5.5: `Result`, `Failure` |
 | [src/cpp/tls_context.cpp](src/cpp/tls_context.cpp) | 414 | 106 (26%) | 275 | 9 | 24 | Fable 5: the socket adapter over `ianet.crypto`. Fable 5.1: default groups, wildcard option. Opus 5.5: error wrapping |
 | [src/modules/ianet.cppm](src/modules/ianet.cppm) | 226 | 219 (97%) | 7 | 0 | 0 | Fable 5: internal TLS declarations |
 | [src/modules/ianet.crypto.cppm](src/modules/ianet.crypto.cppm) | 182 | 2 (1%) | 168 | 12 | 0 | Fable 5: nearly all of it. Fable 5.1: `TlsIdentityMatching` |
+| [src/modules/ianet.http.cppm](src/modules/ianet.http.cppm) | 101 | 97 (96%) | 0 | 0 | 4 | Opus 5.5: doc comments on when receiving fails |
 | [src/modules/ianet.https.cppm](src/modules/ianet.https.cppm) | 83 | 79 (95%) | 0 | 0 | 4 | Opus 5.5: error wrapping |
 | [src/modules/ianet.tls.cppm](src/modules/ianet.tls.cppm) | 76 | 68 (89%) | 4 | 4 | 0 | Fable 5: `expected_peer_name`. Fable 5.1: `allow_wildcard_peer_names` |
 
@@ -54,6 +55,7 @@ Each count is the number of lines that survive today. The few human lines in fil
 
 | File | Lines | Human | Claude Fable 5 | Claude Fable 5.1 | Claude Opus 5.5 |
 | --- | --- | --- | --- | --- | --- |
+| [tests/cpp/http_tests.cpp](tests/cpp/http_tests.cpp) | 308 | 153 (50%) | 0 | 0 | 155 |
 | [tests/cpp/tls_group_tests.cpp](tests/cpp/tls_group_tests.cpp) | 119 | 8 (7%) | 0 | 111 | 0 |
 | [tests/cpp/tls_tests.cpp](tests/cpp/tls_tests.cpp) | 328 | 281 (86%) | 0 | 47 | 0 |
 
@@ -89,8 +91,8 @@ AI commits changed these files too, but none of their lines survive:
 
 The AI relicense commit changed the licence header in most of these. Nothing else in them has an AI commit.
 
-- **Library:** `src/cpp/client.cpp`, `src/cpp/context.cpp`, `src/cpp/server.cpp`, `src/modules/ianet.http.cppm`
-- **Tests:** `tests/cpp/http_tests.cpp`, `tests/cpp/main.cpp`, `tests/cpp/socket_tests.cpp`
+- **Library:** `src/cpp/client.cpp`, `src/cpp/context.cpp`, `src/cpp/server.cpp`
+- **Tests:** `tests/cpp/main.cpp`, `tests/cpp/socket_tests.cpp`
 - **Build files and presets:** `CMakePresets.json`, `cmake/docs.cmake`
 - **CI, tools and config:** `.clang-format`, `.clang-tidy`, `.gitignore`, `.vscode/settings.json`, `.vscode/tasks.json`
 - **README and docs:** `docs/requirements.txt`
@@ -101,6 +103,7 @@ Commits that only change this file are left out.
 
 | Commit | Date | Model | Author | Subject |
 | --- | --- | --- | --- | --- |
+| `9ec888c` | 2026-11-25 | Claude Opus 5.5 | Claude | [FIX]: HTTP - Reject Bad Content-Length, Read Bodies In Chunks |
 | `0b22aaf` | 2026-11-25 | Claude Opus 5.5 | Claude | [FIX]: CI - Build AWS-LC With /EHsc On MSVC |
 | `b6bb8ff` | 2026-11-24 | Claude Opus 5.5 | Claude | [MAINTAIN]: Rewrite README, Update Docs Pages |
 | `1983416` | 2026-11-24 | Claude Opus 5.5 | Claude | [CI]: Add tools/authorship_map.py And Its Check, Build At C++20 And C++23 |
